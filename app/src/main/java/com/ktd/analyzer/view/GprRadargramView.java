@@ -18,6 +18,8 @@ public final class GprRadargramView extends View {
     public static final int FILTER_NONE=0, FILTER_DC=1, FILTER_BACKGROUND=2, FILTER_VERTICAL=3;
     public static final int PALETTE_GRAY=0, PALETTE_DIVERGING=1, PALETTE_SEPIA=2;
     private static final int MAX_TRACES=512;
+    private static final int VISIBLE_TRACES=180; // Fixed-width rolling radargram, new traces enter at right
+    private static final double USER_GPR_DEPTH_DISPLAY_SCALE=10000.0; // Requested display scale only, NOT a measured physical calibration
     private final ArrayDeque<GprProtocol.Trace> traces=new ArrayDeque<>();
     private final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint label=new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -113,6 +115,7 @@ public final class GprRadargramView extends View {
         int ww=Math.max(1,w-left-right),hh=Math.max(1,h-top-bottom);
         p.setStyle(Paint.Style.FILL);p.setColor(Color.BLACK);canvas.drawRect(left,top,left+ww,top+hh,p);
         List<GprProtocol.Trace> items=snapshot();
+        if(items.size()>VISIBLE_TRACES)items=items.subList(items.size()-VISIBLE_TRACES,items.size());
         int visibleN=items.size();
         int visibleSamples=nSamples;
         if(hasTimeAxis()&&Double.isFinite(timeWindowNs))
@@ -140,7 +143,9 @@ public final class GprRadargramView extends View {
             }
             Bitmap bmp=Bitmap.createBitmap(pixels,visibleN,rows,Bitmap.Config.ARGB_8888);
             p.setFilterBitmap(true);p.setStyle(Paint.Style.FILL);
-            canvas.drawBitmap(bmp,new Rect(0,0,visibleN,rows),new Rect(left,top,left+ww,top+hh),p);
+            // Preserve a fixed x-step; leave unfilled space black and scroll left after 180 traces.
+            int drawnW=Math.max(1,Math.round(ww*(visibleN/(float)VISIBLE_TRACES)));
+            canvas.drawBitmap(bmp,new Rect(0,0,visibleN,rows),new Rect(left,top,left+drawnW,top+hh),p);
             bmp.recycle();
         }
         p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(dp*.65f);p.setColor(Color.rgb(85,111,125));
@@ -156,7 +161,7 @@ public final class GprRadargramView extends View {
                 double dep=GprProtocol.depthMeters(index,dtNs,epsilonR,0);
                 if(Double.isFinite(dep)){
                     label.setTextAlign(Paint.Align.LEFT);
-                    canvas.drawText(String.format(Locale.US,"%.2f",dep),left+ww+5*dp,y+4*dp,label);
+                    canvas.drawText(String.format(Locale.US,"%.2f",dep/USER_GPR_DEPTH_DISPLAY_SCALE),left+ww+5*dp,y+4*dp,label);
                 }
             }
         }
@@ -165,20 +170,19 @@ public final class GprRadargramView extends View {
         canvas.drawText(hasTimeAxis()?"ns":"ÖRNEK",left-5*dp,top-9*dp,label);
         if(hasTimeAxis()){
             label.setTextAlign(Paint.Align.LEFT);
-            canvas.drawText("m*",left+ww+5*dp,top-9*dp,label);
+            // GPR numeric depth scale: no unit label.
         }
-        int maxTags=10;
-        label.setTextAlign(Paint.Align.CENTER);
+        // Single fixed trace label, no repeated "İz" labels over ns ticks.
+        label.setTextAlign(Paint.Align.LEFT);
         label.setColor(Color.rgb(210,224,232));
-        for(int x=0;x<maxTags;x++){
-            float pos=(x+.5f)/maxTags;
-            float cx=left+pos*ww;
-            long seq=visibleN==0?0:items.get(Math.min(visibleN-1,Math.round((visibleN-1)*pos))).sequence;
-            canvas.drawText(visibleN>0?"İz "+seq:"—",cx,top-7*dp,label);
-            if(x>0){p.setColor(Color.argb(65,145,168,183));canvas.drawLine(cx-ww/maxTags/2f,top,cx-ww/maxTags/2f,top+hh,p);}
+        if(visibleN>0)canvas.drawText(Long.toString(items.get(0).sequence),left+5*dp,top-7*dp,label);
+        for(int x=1;x<8;x++){
+            float cx=left+x*ww/8f;
+            p.setColor(Color.argb(65,145,168,183));
+            canvas.drawLine(cx,top,cx,top+hh,p);
         }
         label.setTextAlign(Paint.Align.LEFT);label.setColor(Color.rgb(150,187,202));
-        String dx=(Double.isFinite(dxMeters)&&dxMeters>0)?String.format(Locale.US,"%.2f m",Math.max(0,visibleN-1)*dxMeters):"İz "+visibleN;
+        String dx=(Double.isFinite(dxMeters)&&dxMeters>0)?String.format(Locale.US,"%.2f m",Math.max(0,visibleN-1)*dxMeters):Integer.toString(visibleN);
         canvas.drawText(dx,left+5*dp,h-3*dp,label);
     }
 }

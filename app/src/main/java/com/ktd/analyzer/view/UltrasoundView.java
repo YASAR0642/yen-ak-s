@@ -17,7 +17,7 @@ import java.util.List;
  * Renkler 3D yüzeyle aynı ColorMaps paletinden, opak ve canlı çizilir.
  */
 public final class UltrasoundView extends View {
-    private static final int N = 220;
+    private static final int N = 2400;
     private final float[] d = new float[N];
     private final boolean[] used = new boolean[N];
     private int head = 0, count = 0, palette = 0;
@@ -56,38 +56,55 @@ public final class UltrasoundView extends View {
         maxAbs=Math.max(maxAbs,Math.abs(delta));
     }
 
+    /**
+     * Continuous waterfall display. New sensor samples start at the BOTTOM. Older
+     * rows advance upwards and disappear beyond the top edge, never accumulating.
+     * Pixel-space sample pitch stays fixed so new samples never stretch the whole
+     * history (the previous implementation recalculated its scale every frame).
+     */
     @Override protected void onDraw(Canvas c){
         super.onDraw(c);
-        int w=getWidth(),h=getHeight(); if(w<=0||h<=0)return;
-        final int rows=Math.min(count,150), bands=160;
-        if(rows==0)return;
-        // Her piksel komşu örneklerin düzgün ağırlıklı ortalamasıyla hesaplanır;
-        // dikdörtgen bloklardan kaynaklanan keskin basamakları kaldırır.
-        android.graphics.Bitmap bm=android.graphics.Bitmap.createBitmap(bands,rows,android.graphics.Bitmap.Config.ARGB_8888);
+        final int w=getWidth(), h=getHeight();
+        if(w<=0||h<=0||count==0)return;
+        final int cols=144;
+        final int rows=Math.max(1,Math.min(h,1024));
+        final float pixelsPerSample=12.0f; // Daha seri akış: her gerçek örnekte 12 ekran pikseli
+        final float scale=(float)h/rows;
+        android.graphics.Bitmap bm=android.graphics.Bitmap.createBitmap(cols,rows,android.graphics.Bitmap.Config.RGB_565);
+        // Match the visible step size to physical pixels, regardless of screen height.
+        final float rowPitch=pixelsPerSample/Math.max(.01f,scale);
+        final int background=Color.rgb(3,9,14);
         for(int y=0;y<rows;y++){
-            float pos=y*Math.max(0,count-1f)/Math.max(1,rows-1);
-            int j=(int)pos;float frac=pos-j;
+            float age=(rows-1-y)/rowPitch; // alt = yeni veri, ust = eski veri
+            if(age>count-1){
+                for(int x=0;x<cols;x++)bm.setPixel(x,y,background);
+                continue;
+            }
+            int j=(int)age;
+            float t=age-j;
             float a=d[(head-1-j+N)%N];
             float b=d[(head-1-Math.min(count-1,j+1)+N)%N];
-            float amp=a+(b-a)*frac;
-            for(int x=0;x<bands;x++){
-                float nx=(x+.5f)/bands;
-                float magnitude=Math.min(1f,Math.abs(amp)*displayGain/Math.max(1f,maxAbs));
-                float breadth=.14f+.16f*magnitude;
-                float q=(nx-.5f)/Math.max(.05f,breadth);
+            // Smoothstep eliminates visible horizontal cell boundaries.
+            t=t*t*(3f-2f*t);
+            float signal=a+(b-a)*t;
+            float magnitude=Math.min(1f,Math.abs(signal)*displayGain/Math.max(1f,maxAbs));
+            float breadth=.15f+.16f*magnitude;
+            for(int x=0;x<cols;x++){
+                float nx=(x+.5f)/cols;
+                // Low-amplitude lateral drift makes the trace continuous and fluid;
+                // it does not alter the measured value or depth computation.
+                float drift=.012f*(float)Math.sin(age*.11f)+.006f*(float)Math.sin(age*.035f);
+                float q=(nx-.5f-drift)/Math.max(.05f,breadth);
                 float envelope=(float)Math.exp(-2.6f*q*q);
-                float local=amp*envelope*displayGain;
-                int col;
+                float local=signal*envelope*displayGain;
+                int color;
                 if(gprStyle){
-                    // Radargram benzeri dikey iz: aynı manyetik örnek; radar/SGY ölçümü değildir.
                     float intensity=Math.min(1f,Math.abs(local)/Math.max(1f,maxAbs));
-                    int base=ColorMaps.color(palette,local,maxAbs);
-                    col=intensity<.025f?Color.rgb(5,14,18):base;
+                    color=intensity<.025f?Color.rgb(5,14,18):ColorMaps.color(palette,local,maxAbs);
                 }else{
-                    col=ColorMaps.color(palette,local,maxAbs);
-                    if(envelope<.02f)col=Color.rgb(5,14,18);
+                    color=envelope<.02f?Color.rgb(5,14,18):ColorMaps.color(palette,local,maxAbs);
                 }
-                bm.setPixel(x,y,col);
+                bm.setPixel(x,y,color);
             }
         }
         p.setFilterBitmap(true);

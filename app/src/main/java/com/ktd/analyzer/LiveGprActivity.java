@@ -52,10 +52,27 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
     private GprRadargramView radar;
     private GprTracePanelsView panels;
     private TextView connection, gainLabel, footer;
-    private Button startButton,filterButton,timeButton,antennaButton,colorButton,soundButton,hyperbolaButton,autoButton,voiceButton;
+    private Button startButton,pauseButton,restartButton,speedButton,filterButton,timeButton,antennaButton,colorButton,soundButton,hyperbolaButton,autoButton,voiceButton;
     private float gain=1f;
     private int antennaMhz=300,filter=0,timeIndex=0,soundTone=0;
     private long count=0,lastAudio=0;
+    private final ArrayList<GprProtocol.Trace> loadedTraces=new ArrayList<>();
+    private boolean fileMode=false,playingFile=false;
+    private int replayPosition=0, replaySpeed=1;
+    private static final int REPLAY_FRAME_MS=40;
+    private final Runnable replayTick=new Runnable(){@Override public void run(){
+        if(!fileMode||!playingFile)return;
+        int batch=replaySpeed;
+        while(batch-->0&&replayPosition<loadedTraces.size()){
+            GprProtocol.Trace trace=loadedTraces.get(replayPosition++);
+            radar.add(trace);count++;
+            if(sound)alertSignal(trace);
+        }
+        panels.invalidate();updateFooter();
+        if(replayPosition>=loadedTraces.size()){
+            playingFile=false;refreshReplayButtons();
+        }else ui.postDelayed(this,REPLAY_FRAME_MS);
+    }};
     private double eps=9.0, timeOverrideNs=Double.NaN, lastDeviceNs=Double.NaN;
     private ToneGenerator tone;
     private final double[] timeOptions={Double.NaN,30,60,100,150,200,300,500};
@@ -78,7 +95,7 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
         wanted=false;
         if(running&&BluetoothClient.isConnected())bluetooth.send("GPR_STOP\n");
         running=false;BluetoothClient.stopGprLines(this);bluetooth.release();
-        ui.removeCallbacks(flush);synchronized(guard){queue.clear();flushScheduled=false;}
+        ui.removeCallbacks(flush);ui.removeCallbacks(replayTick);playingFile=false;synchronized(guard){queue.clear();flushScheduled=false;}
         super.onStop();
     }
     @Override protected void onDestroy(){if(tone!=null){tone.release();tone=null;}super.onDestroy();}
@@ -105,8 +122,6 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
         connection=text("COM",11);connection.setBackground(Ui.bg(NAVY,6,this));
         connection.setOnClickListener(v->bluetooth.pickPaired(this));
         head.addView(connection,new LinearLayout.LayoutParams(dp(110),dp(34)));
-        Button menu=action("⋮");menu.setOnClickListener(v->extraMenu());
-        head.addView(menu,new LinearLayout.LayoutParams(dp(40),dp(38)));
         root.addView(head,new LinearLayout.LayoutParams(-1,dp(43)));
 
         LinearLayout body=new LinearLayout(this);body.setOrientation(LinearLayout.HORIZONTAL);
@@ -134,42 +149,23 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
         middle.addView(panels,new LinearLayout.LayoutParams(-1,0,1));
         body.addView(middle,weighted(20));
 
-        LinearLayout control=new LinearLayout(this);control.setPadding(dp(2),dp(1),dp(1),0);
+        LinearLayout control=new LinearLayout(this);control.setPadding(dp(3),dp(3),dp(3),dp(3));
         control.setOrientation(LinearLayout.VERTICAL);
-        Button com=action("◉\nCOM");com.setOnClickListener(v->bluetooth.pickPaired(this));
-        Button open=action("▣\nSGY AÇ");open.setOnClickListener(v->openFile());
+        Button com=action("COM");
+        com.setOnClickListener(v->bluetooth.pickPaired(this));
+        Button open=action("DOSYA AÇ");
+        open.setOnClickListener(v->openFile());
         addRow(control,com,open);
-        startButton=action("▶\nBAŞLAT");startButton.setOnClickListener(v->toggle());
-        colorButton=action("◉\nRENK");colorButton.setOnClickListener(v->{
-            radar.setPalette((radar.getPalette()+1)%3);panels.invalidate();
-        });
-        addRow(control,startButton,colorButton);
-        Button clear=action("⌁\nTEMİZLE");clear.setOnClickListener(v->{radar.clear();panels.invalidate();count=0;updateFooter();});
-        Button save=action("▣\nKAYDET");save.setOnClickListener(v->save());
-        addRow(control,clear,save);
-        filterButton=action("FİLTRE\nYOK");filterButton.setOnClickListener(v->{
-            filter=(filter+1)%filters.length;radar.setFilterMode(filter);
-            filterButton.setText(filters[filter].replace(' ','\n'));
-        });
-        timeButton=action("ZAMAN\nTÜMÜ");timeButton.setOnClickListener(v->chooseTime());
-        addRow(control,filterButton,timeButton);
-        Button soil=action("ZEMİN\nSEÇ");soil.setOnClickListener(v->chooseSoil());
-        antennaButton=action("ANTEN\n300 MHz");antennaButton.setOnClickListener(v->chooseAntenna());
-        addRow(control,soil,antennaButton);
-        soundButton=action("SES\nAÇIK");soundButton.setOnClickListener(v->{sound=!sound;soundButton.setText(sound?"SES\nAÇIK":"SES\nKAPALI");});
-        hyperbolaButton=action("HİPERBOL\nAÇIK");hyperbolaButton.setOnClickListener(v->{
-            hyperbola=!hyperbola;radar.setHyperbolaEnhance(hyperbola);
-            hyperbolaButton.setText(hyperbola?"HİPERBOL\nAÇIK":"HİPERBOL\nKAPALI");
-        });
-        addRow(control,soundButton,hyperbolaButton);
-        autoButton=action("OTOMATİK\nAÇIK");autoButton.setOnClickListener(v->{
-            auto=!auto;radar.setAutoContrast(auto);autoButton.setText(auto?"OTOMATİK\nAÇIK":"OTOMATİK\nKAPALI");
-        });
-        voiceButton=action("SES TONU\nYÜKSEK");voiceButton.setOnClickListener(v->{
-            soundTone=(soundTone+1)%3;
-            voiceButton.setText("SES TONU\n"+(soundTone==0?"YÜKSEK":soundTone==1?"ORTA":"ALÇAK"));
-        });
-        addRow(control,autoButton,voiceButton);
+        Button save=action("KAYDET");
+        save.setOnClickListener(v->save());
+        startButton=action("BAŞLAT");
+        startButton.setOnClickListener(v->toggle());
+        addRow(control,save,startButton);
+        Button stop=action("DURDUR");
+        stop.setOnClickListener(v->stopGprFromButton());
+        timeButton=action("ZAMAN");
+        timeButton.setOnClickListener(v->chooseTime());
+        addRow(control,stop,timeButton);
         body.addView(control,weighted(17));
         root.addView(body,new LinearLayout.LayoutParams(-1,0,1));
         footer=text("COM • 0 İZ",10);footer.setGravity(Gravity.CENTER_VERTICAL);
@@ -193,21 +189,69 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
     }
     private void updateFooter(){
         if(footer==null)return;
-        String mode=radar.isDemo()?"DEMO":radar.hasTimeAxis()?"ns + m*":"ÖRNEK";
-        footer.setText(String.format(Locale.forLanguageTag("tr-TR"),"%s  •  %d İZ  •  %s  •  εr=%.0f",BluetoothClient.isConnected()?"COM BAĞLI":"COM KAPALI",count,mode,eps));
+        String mode=fileMode?(playingFile?"DOSYA OYNATILIYOR":"DOSYA DURDU"):(radar.isDemo()?"DEMO":radar.hasTimeAxis()?"ns":"ÖRNEK");
+        footer.setText(String.format(Locale.forLanguageTag("tr-TR"),"%s  •  %d İZ  •  %s  •  εr=%.0f",fileMode?(replayPosition+"/"+loadedTraces.size()):BluetoothClient.isConnected()?"COM BAĞLI":"COM KAPALI",count,mode,eps));
+    }
+    private void stopPlayback(){playingFile=false;ui.removeCallbacks(replayTick);}
+    private void refreshReplayButtons(){
+        if(startButton!=null)startButton.setText(fileMode?(playingFile?"DURAKLAT":"BAŞLAT"):(running?"ÇALIŞIYOR":"BAŞLAT"));
+        if(pauseButton!=null)pauseButton.setText(playingFile?"Ⅱ\nDURAKLAT":"▶\nDEVAM");
+    }
+    private void startReplay(boolean fromBeginning){
+        if(!fileMode||loadedTraces.isEmpty()){Toast.makeText(this,"Önce bir SGY/CSV dosyası açın",Toast.LENGTH_SHORT).show();return;}
+        stopPlayback();
+        if(fromBeginning||replayPosition>=loadedTraces.size()){
+            replayPosition=0;count=0;radar.resetSession();panels.invalidate();
+            radar.setImportedMeta(Double.isFinite(timeOverrideNs)?timeOverrideNs:lastDeviceNs,radar.getStepMeters(),false);
+        }
+        playingFile=true;refreshReplayButtons();ui.post(replayTick);updateFooter();
+    }
+    private void restartReplay(){
+        if(!fileMode){Toast.makeText(this,"Yeniden oynatmak için dosya açın",Toast.LENGTH_SHORT).show();return;}
+        startReplay(true);
+    }
+    private void pauseOrResume(){
+        if(!fileMode){Toast.makeText(this,"Önce SGY veya CSV dosyası açın",Toast.LENGTH_SHORT).show();return;}
+        if(playingFile){stopPlayback();refreshReplayButtons();updateFooter();}
+        else startReplay(false);
+    }
+    private void showReplayInfo(){
+        new AlertDialog.Builder(this).setTitle("GPR DOSYA / OYNATMA")
+            .setMessage(fileMode?("İz: "+replayPosition+" / "+loadedTraces.size()+"\nOynatma: "+replaySpeed+"×\nOynatma gerçek zamanlı ölçüm değil, dosyadaki izlerin sırayla gösterimidir."):
+              "SGY/SEGY veya CSV dosyası açıp tekrar oynatabilirsiniz. Canlı GPR için Bluetooth bağlantısı gerekir.")
+            .setPositiveButton("TAMAM",null).show();
     }
     private void start(){
         if(!BluetoothClient.isConnected()){bluetooth.pickPaired(this);return;}
+        stopPlayback();fileMode=false;loadedTraces.clear();
         radar.resetSession();count=0;panels.invalidate();
         wanted=true;
         if(bluetooth.send("GPR_START\n")){
             running=true;wasDemo=false;
-            startButton.setText("■\nDURDUR");
+            startButton.setText("ÇALIŞIYOR");
         }
         updateFooter();
     }
+    /** Stops live acquisition or pauses a file replay and resets its cursor for restart. */
+    private void stopGprFromButton(){
+        if(fileMode){
+            stopPlayback();
+            replayPosition=0;
+            count=0;
+            radar.resetSession();
+            panels.invalidate();
+            refreshReplayButtons();
+            updateFooter();
+            return;
+        }
+        if(running){bluetooth.send("GPR_STOP\n");}
+        wanted=false;running=false;
+        refreshReplayButtons();
+        updateFooter();
+    }
     private void toggle(){
-        if(running){wanted=false;running=false;bluetooth.send("GPR_STOP\n");startButton.setText("▶\nBAŞLAT");}
+        if(fileMode){if(playingFile){stopPlayback();refreshReplayButtons();updateFooter();}else startReplay(false);return;}
+        if(running){wanted=false;running=false;bluetooth.send("GPR_STOP\n");startButton.setText("BAŞLAT");}
         else start();
     }
     private void extraMenu(){
@@ -220,7 +264,7 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
         if(!BluetoothClient.isConnected()){bluetooth.pickPaired(this);return;}
         radar.resetSession();count=0;
         if(bluetooth.send("GPR_DEMO_START\n")){
-            wanted=true;running=true;wasDemo=true;startButton.setText("■\nDURDUR");
+            wanted=true;running=true;wasDemo=true;startButton.setText("ÇALIŞIYOR");
         }
     }
     private void chooseTime(){
@@ -265,7 +309,7 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
         String[] options={"100 MHz","200 MHz","300 MHz","400 MHz","500 MHz","800 MHz"};
         final int[] values={100,200,300,400,500,800};
         new AlertDialog.Builder(this).setTitle("ANTEN SEÇ").setItems(options,(d,n)->{
-            antennaMhz=values[n];antennaButton.setText("ANTEN\n"+antennaMhz+" MHz");
+            antennaMhz=values[n];if(antennaButton!=null)antennaButton.setText("ANTEN\n"+antennaMhz+" MHz");
             // It is a display preset; RF hardware cannot be retuned without a supported command.
         }).show();
     }
@@ -291,17 +335,20 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
                 }
                 runOnUiThread(()->{
                     if(running)bluetooth.send("GPR_STOP\n");
-                    running=false;wanted=false;startButton.setText("▶\nBAŞLAT");
-                    radar.resetSession();lastDeviceNs=rec.dtNs;
+                    running=false;wanted=false;startButton.setText("BAŞLAT");
+                    stopPlayback();
+                    loadedTraces.clear();loadedTraces.addAll(rec.traces);
+                    fileMode=true;replayPosition=0;count=0;lastDeviceNs=rec.dtNs;
+                    radar.resetSession();
                     radar.setImportedMeta(Double.isFinite(timeOverrideNs)?timeOverrideNs:rec.dtNs,rec.dxMeters,false);
-                    for(GprProtocol.Trace t:rec.traces)radar.add(t);
-                    count=rec.traces.size();panels.invalidate();updateFooter();
+                    panels.invalidate();updateFooter();
+                    startReplay(true);
                 });
             }catch(Exception ex){runOnUiThread(()->Toast.makeText(this,"GPR dosyası açılamadı: "+ex.getMessage(),Toast.LENGTH_LONG).show());}
         },"ktd-gpr-import").start();
     }
     private void save(){
-        if(radar.traceCount()==0){Toast.makeText(this,"İz bulunamadı",Toast.LENGTH_SHORT).show();return;}
+        if(radar.traceCount()==0 && (!fileMode||loadedTraces.isEmpty())){Toast.makeText(this,"İz bulunamadı",Toast.LENGTH_SHORT).show();return;}
         Intent intent=new Intent(Intent.ACTION_CREATE_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);intent.setType("text/csv");
         String date=new SimpleDateFormat("yyyyMMdd_HHmmss",Locale.US).format(new Date());
@@ -315,7 +362,7 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
         if(request==OPEN_FILE){
             loadUri(uri);
         } else if(request==SAVE_FILE){
-            final List<GprProtocol.Trace> current=radar.snapshot();
+            final List<GprProtocol.Trace> current=fileMode?new ArrayList<>(loadedTraces):radar.snapshot();
             final double time=radar.getSampleIntervalNs(),dx=radar.getStepMeters();
             new Thread(()->{
                 try(OutputStream o=getContentResolver().openOutputStream(uri)){
@@ -327,10 +374,11 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
         }
     }
     @Override public void onState(String s){runOnUiThread(()->{
-        refresh();if(!BluetoothClient.isConnected()){running=false;startButton.setText("▶\nBAŞLAT");}
+        refresh();if(!BluetoothClient.isConnected()){running=false;startButton.setText("BAŞLAT");}
     });}
     @Override public void onFrame(SensorFrame f){/* Magnetometer is never converted to radar traces. */}
     @Override public void onGprLine(String line){
+        if(fileMode)return;
         GprProtocol.Message m=GprProtocol.parse(line);if(m==null)return;
         synchronized(guard){
             while(queue.size()>128)queue.removeFirst();
