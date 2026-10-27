@@ -17,7 +17,7 @@ import java.util.Locale;
 public final class GprRadargramView extends View {
     public static final int FILTER_NONE=0, FILTER_DC=1, FILTER_BACKGROUND=2, FILTER_VERTICAL=3;
     public static final int PALETTE_GRAY=0, PALETTE_DIVERGING=1, PALETTE_SEPIA=2;
-    private static final int MAX_TRACES=512;
+    private static final int MAX_TRACES=180; // Bounded rolling display; acquisition has no trace-count limit
     private static final int VISIBLE_TRACES=180; // Fixed-width rolling radargram, new traces enter at right
     private static final double USER_GPR_DEPTH_DISPLAY_SCALE=10000.0; // Requested display scale only, NOT a measured physical calibration
     private final ArrayDeque<GprProtocol.Trace> traces=new ArrayDeque<>();

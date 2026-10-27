@@ -107,7 +107,10 @@ public final class GprFileIo {
         String textualHeader=new String(text,java.nio.charset.StandardCharsets.ISO_8859_1).toUpperCase(Locale.US);
         // KTD PC GPR v8.5 exports SGY with a *placeholder* 1 us sample interval.
         // Never treat that placeholder as real propagation time or metre depth.
-        boolean unverifiedTime=textualHeader.contains("REAL ACQUISITION DT UNVERIFIED")
+        // Prism's SEG-Y export is explicitly seismic-format-compatible, not calibrated GPR depth.
+        boolean prismHeader=textualHeader.contains("PRISM FOR WINDOWS")
+                || textualHeader.contains("INTENDED FOR SEISMIC (NOT GEORADAR)");
+        boolean unverifiedTime=prismHeader || textualHeader.contains("REAL ACQUISITION DT UNVERIFIED")
                 || textualHeader.contains("SAMPLE INTERVAL HEADER=1 US PLACEHOLDER");
         byte[] binary=new byte[400];exactly(in,binary);
         int interval=u16(binary,16,false),n=u16(binary,20,false),format=u16(binary,24,false);

@@ -59,7 +59,11 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
     private final ArrayList<GprProtocol.Trace> loadedTraces=new ArrayList<>();
     private boolean fileMode=false,playingFile=false;
     private int replayPosition=0, replaySpeed=1;
+    private int selectedPalette=1;
     private static final int REPLAY_FRAME_MS=40;
+    // Bluetooth input is drained in short batches; display memory stays bounded.
+    private static final int MAX_PENDING_MESSAGES=4096;
+    private long droppedGprMessages=0;
     private final Runnable replayTick=new Runnable(){@Override public void run(){
         if(!fileMode||!playingFile)return;
         int batch=replaySpeed;
@@ -126,7 +130,7 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
 
         LinearLayout body=new LinearLayout(this);body.setOrientation(LinearLayout.HORIZONTAL);
         radar=new GprRadargramView(this);
-        radar.setPalette(GprRadargramView.PALETTE_GRAY);
+        radar.setPalette(GprRadargramView.PALETTE_DIVERGING);
         radar.setHyperbolaEnhance(hyperbola);
         radar.setEpsilon(eps);
         body.addView(radar,weighted(66));
@@ -166,6 +170,11 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
         timeButton=action("ZAMAN");
         timeButton.setOnClickListener(v->chooseTime());
         addRow(control,stop,timeButton);
+        Button colors=action("RENK");
+        colors.setOnClickListener(v->choosePalette());
+        LinearLayout paletteRow=new LinearLayout(this);
+        paletteRow.addView(colors,new LinearLayout.LayoutParams(-1,dp(36)));
+        control.addView(paletteRow,new LinearLayout.LayoutParams(-1,dp(37)));
         body.addView(control,weighted(17));
         root.addView(body,new LinearLayout.LayoutParams(-1,0,1));
         footer=text("COM • 0 İZ",10);footer.setGravity(Gravity.CENTER_VERTICAL);
@@ -200,7 +209,7 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
     private void startReplay(boolean fromBeginning){
         if(!fileMode||loadedTraces.isEmpty()){Toast.makeText(this,"Önce bir SGY/CSV dosyası açın",Toast.LENGTH_SHORT).show();return;}
         stopPlayback();
-        if(fromBeginning||replayPosition>=loadedTraces.size()){
+        if(fromBeginning||replayPosition==0||replayPosition>=loadedTraces.size()){
             replayPosition=0;count=0;radar.resetSession();panels.invalidate();
             radar.setImportedMeta(Double.isFinite(timeOverrideNs)?timeOverrideNs:lastDeviceNs,radar.getStepMeters(),false);
         }
@@ -238,8 +247,7 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
             stopPlayback();
             replayPosition=0;
             count=0;
-            radar.resetSession();
-            panels.invalidate();
+            showFullPreview();
             refreshReplayButtons();
             updateFooter();
             return;
@@ -266,6 +274,25 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
         if(bluetooth.send("GPR_DEMO_START\n")){
             wanted=true;running=true;wasDemo=true;startButton.setText("ÇALIŞIYOR");
         }
+    }
+    private void choosePalette(){
+        String[] choices={"Siyah - Beyaz", "Renkli (Kırmızı / Mavi)", "Sepya"};
+        new AlertDialog.Builder(this).setTitle("RADARGRAM RENKLERİ")
+            .setSingleChoiceItems(choices,selectedPalette,(d,choice)->{
+                selectedPalette=choice;radar.setPalette(choice);d.dismiss();
+            }).setNegativeButton("İPTAL",null).show();
+    }
+    private void showFullPreview(){
+        radar.resetSession();count=0;
+        radar.setImportedMeta(Double.isFinite(timeOverrideNs)?timeOverrideNs:lastDeviceNs,Double.NaN,false);
+        // Complete recording is represented in the fixed-width preview without dropping its timeline.
+        int total=loadedTraces.size();
+        final int columns=Math.min(180,total);
+        for(int k=0;k<columns;k++){
+            int idx=(int)((long)k*total/columns);
+            radar.add(loadedTraces.get(idx));
+        }
+        panels.invalidate();updateFooter();
     }
     private void chooseTime(){
         String[] choices={"Tümü", "30 ns", "60 ns", "100 ns", "150 ns", "200 ns", "300 ns", "500 ns"};
@@ -341,8 +368,9 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
                     fileMode=true;replayPosition=0;count=0;lastDeviceNs=rec.dtNs;
                     radar.resetSession();
                     radar.setImportedMeta(Double.isFinite(timeOverrideNs)?timeOverrideNs:rec.dtNs,rec.dxMeters,false);
-                    panels.invalidate();updateFooter();
-                    startReplay(true);
+                    // Opening a file must only preview the whole recording. PLAY begins acquisition-style replay.
+                    showFullPreview();refreshReplayButtons();
+                    Toast.makeText(this,"Dosya hazır: "+loadedTraces.size()+" iz. BAŞLAT ile oynat.",Toast.LENGTH_LONG).show();
                 });
             }catch(Exception ex){runOnUiThread(()->Toast.makeText(this,"GPR dosyası açılamadı: "+ex.getMessage(),Toast.LENGTH_LONG).show());}
         },"ktd-gpr-import").start();
@@ -381,9 +409,11 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
         if(fileMode)return;
         GprProtocol.Message m=GprProtocol.parse(line);if(m==null)return;
         synchronized(guard){
-            while(queue.size()>128)queue.removeFirst();
+            while(queue.size()>=MAX_PENDING_MESSAGES){
+                queue.removeFirst();droppedGprMessages++;
+            }
             queue.addLast(m);
-            if(!flushScheduled){flushScheduled=true;ui.postDelayed(flush,75);}
+            if(!flushScheduled){flushScheduled=true;ui.postDelayed(flush,30);}
         }
     }
     private final Runnable flush=new Runnable(){@Override public void run(){
