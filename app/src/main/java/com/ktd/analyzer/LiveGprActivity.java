@@ -59,6 +59,8 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
     private final ArrayList<GprProtocol.Trace> loadedTraces=new ArrayList<>();
     private boolean fileMode=false,playingFile=false;
     private int replayPosition=0, replaySpeed=1;
+    private double loadedDxMeters=Double.NaN;
+    private int replayPreviewColumns=180;
     private int selectedPalette=1;
     private static final int REPLAY_FRAME_MS=40;
     // Bluetooth input is drained in short batches; display memory stays bounded.
@@ -69,7 +71,14 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
         int batch=replaySpeed;
         while(batch-->0&&replayPosition<loadedTraces.size()){
             GprProtocol.Trace trace=loadedTraces.get(replayPosition++);
-            radar.add(trace);count++;
+            // Same horizontal sampling grid as full-record preview: no stretched hyperbolas.
+            final int total=loadedTraces.size();
+            final int columns=Math.min(180,total);
+            final int playedIndex=replayPosition-1;
+            // Preview chooses floor(k*total/columns); replay chooses the identical indices.
+            final int column=(int)(((long)playedIndex*columns+total-1)/total);
+            if(column<columns && (int)((long)column*total/columns)==playedIndex) radar.add(trace);
+            count++;
             if(sound)alertSignal(trace);
         }
         panels.invalidate();updateFooter();
@@ -211,7 +220,7 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
         stopPlayback();
         if(fromBeginning||replayPosition==0||replayPosition>=loadedTraces.size()){
             replayPosition=0;count=0;radar.resetSession();panels.invalidate();
-            radar.setImportedMeta(Double.isFinite(timeOverrideNs)?timeOverrideNs:lastDeviceNs,radar.getStepMeters(),false);
+            radar.setImportedMeta(Double.isFinite(timeOverrideNs)?timeOverrideNs:lastDeviceNs,loadedDxMeters,false);
         }
         playingFile=true;refreshReplayButtons();ui.post(replayTick);updateFooter();
     }
@@ -284,7 +293,7 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
     }
     private void showFullPreview(){
         radar.resetSession();count=0;
-        radar.setImportedMeta(Double.isFinite(timeOverrideNs)?timeOverrideNs:lastDeviceNs,Double.NaN,false);
+        radar.setImportedMeta(Double.isFinite(timeOverrideNs)?timeOverrideNs:lastDeviceNs,loadedDxMeters,false);
         // Complete recording is represented in the fixed-width preview without dropping its timeline.
         int total=loadedTraces.size();
         final int columns=Math.min(180,total);
@@ -365,7 +374,7 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
                     running=false;wanted=false;startButton.setText("BAŞLAT");
                     stopPlayback();
                     loadedTraces.clear();loadedTraces.addAll(rec.traces);
-                    fileMode=true;replayPosition=0;count=0;lastDeviceNs=rec.dtNs;
+                    fileMode=true;replayPosition=0;count=0;lastDeviceNs=rec.dtNs;loadedDxMeters=rec.dxMeters;
                     radar.resetSession();
                     radar.setImportedMeta(Double.isFinite(timeOverrideNs)?timeOverrideNs:rec.dtNs,rec.dxMeters,false);
                     // Opening a file must only preview the whole recording. PLAY begins acquisition-style replay.

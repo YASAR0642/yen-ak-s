@@ -62,7 +62,7 @@ public final class GprFileIo {
                 for(int i=0;i<n;i++)vals[i]=Short.parseShort(parts[i+1].trim());
                 traces.add(new GprProtocol.Trace(seq,vals));
             }catch(NumberFormatException bad){throw new IOException("Geçersiz radar izi veya örnek değeri",bad);}
-            if(traces.size()>=1600)break;
+            if(traces.size()>=100000)throw new IOException("Çok büyük CSV kaydı; kayıt bölünmeli");
         }
         if(traces.isEmpty())throw new IOException("Radar izi bulunamadı");
         return new Record(traces,ns,dx);
@@ -122,7 +122,7 @@ public final class GprFileIo {
         int bytesPerSample=(format==3?2:format==8?1:4);
         if(!(format==1||format==2||format==3||format==5||format==8))throw new IOException("Desteklenmeyen SEG-Y format kodu: "+format);
         List<GprProtocol.Trace> results=new ArrayList<>();
-        for(int i=0;i<1600;i++){
+        for(int i=0;i<100000;i++){
             byte[] hdr=new byte[240];
             int first=in.read();if(first==-1)break;
             hdr[0]=(byte)first;
