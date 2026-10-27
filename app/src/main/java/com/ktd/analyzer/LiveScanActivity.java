@@ -1,0 +1,307 @@
+package com.ktd.analyzer;
+
+import android.app.Activity;
+import android.graphics.Color;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.view.Gravity;
+import android.widget.Button;
+import android.widget.FrameLayout;
+import android.widget.HorizontalScrollView;
+import android.widget.LinearLayout;
+import android.widget.SeekBar;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import com.ktd.analyzer.bluetooth.BluetoothClient;
+import com.ktd.analyzer.data.ReferenceModel;
+import com.ktd.analyzer.data.ReferenceInverseDepth;
+import com.ktd.analyzer.data.SensorFrame;
+import com.ktd.analyzer.view.ColorMaps;
+import com.ktd.analyzer.view.PaletteStripView;
+import com.ktd.analyzer.view.UltrasoundView;
+
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+
+/**
+ * KTD 3D CANLI TARAMA
+ * - ESP32 LIVE_START ile sürekli veri yollar.
+ * - DURDUR -> LIVE_STOP, BAŞLAT -> LIVE_START.
+ * - Ekrana girildiğinde bağlantı varsa canlı akış otomatik başlar.
+ * - İlk gerçek paket gizli ortam referansıdır; görüntü ikinci paketten başlar.
+ */
+public final class LiveScanActivity extends Activity implements BluetoothClient.Listener {
+    private BluetoothClient bt;
+    private final ReferenceModel ref = new ReferenceModel();
+    private SensorFrame last, replayToIgnore;
+    private TextView connectionBox, cls;
+    private UltrasoundView ultrasound;
+    private Button liveToggle;
+    private boolean gprStyle=false;
+    private Button normalMode,gprMode;
+    private TextView depthInfo,gainLabel;
+    private float liveGain=1f;
+
+    private boolean autoZeroDone = false;
+    private boolean liveRunning = false;
+    private boolean wantLive = true;
+
+    /*
+     * Bluetooth'tan gelen paketler kaybolmadan kuyruğa alınır.
+     * UI yaklaşık her 8 ms'de boşaltılır; gerçek örnek hızı ESP32'nin RATE değeriyle
+     * belirlenir (firmware varsayılanı 20 ms = 50 paket/saniye).
+     */
+    private static final long UI_FRAME_MS = 8L;
+    private static final int MAX_PENDING = 4096;
+    private final Handler ui = new Handler(Looper.getMainLooper());
+    private final Object queueLock = new Object();
+    private final ArrayDeque<SensorFrame> pending = new ArrayDeque<>();
+    private boolean flushScheduled = false;
+
+    @Override protected void onCreate(Bundle b) {
+        super.onCreate(b);
+        bt = new BluetoothClient(this);
+        liveGain=Prefs.anomalyGain(this);
+        build();
+    }
+
+    @Override protected void onStart() {
+        super.onStart();
+        wantLive = true;
+        liveRunning = false;
+        autoZeroDone = false;
+        ref.clear();
+        replayToIgnore = BluetoothClient.lastFrame();
+        bt.activate();
+        refreshConnection();
+        startLiveIfPossible();
+    }
+
+    @Override protected void onStop() {
+        if(BluetoothClient.isConnected()) bt.send("LIVE_STOP\n");
+        liveRunning = false;
+        updateLiveButton();
+        bt.release();
+        ui.removeCallbacks(flushRunnable);
+        synchronized(queueLock){ pending.clear(); flushScheduled=false; }
+        super.onStop();
+    }
+
+    private void build() {
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(Ui.dp(this,10),Ui.dp(this,8),Ui.dp(this,10),Ui.dp(this,10));
+        root.setBackgroundColor(Color.rgb(7,16,24));
+
+        FrameLayout top = new FrameLayout(this);
+        TextView title = Ui.title(this,"KTD 3D ANALYZER");
+        title.setGravity(Gravity.CENTER);
+        FrameLayout.LayoutParams tlp = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,54));
+        tlp.setMargins(Ui.dp(this,58),0,Ui.dp(this,58),0);
+        top.addView(title,tlp);
+        Button back = Ui.button(this,"‹",false); back.setOnClickListener(v->finish());
+        FrameLayout.LayoutParams blp = new FrameLayout.LayoutParams(Ui.dp(this,54),Ui.dp(this,42),Gravity.END|Gravity.CENTER_VERTICAL);
+        top.addView(back,blp);
+        root.addView(top,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,56)));
+
+        connectionBox = Ui.text(this,"Bluetooth bağlı değil",13,Color.WHITE);
+        connectionBox.setGravity(Gravity.CENTER);
+        connectionBox.setTypeface(null,1);
+        connectionBox.setSingleLine(true);
+        connectionBox.setPadding(Ui.dp(this,12),0,Ui.dp(this,12),0);
+        connectionBox.setOnClickListener(v->{
+            if(BluetoothClient.isConnected()) Toast.makeText(this,"Bağlı: "+BluetoothClient.connectedName(),Toast.LENGTH_SHORT).show();
+            else bt.pickPaired(this);
+        });
+        root.addView(connectionBox,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,44)));
+
+        cls = Ui.text(this,"VERİ BEKLENİYOR",14,Color.rgb(35,214,176));
+        cls.setTypeface(null,1); cls.setGravity(Gravity.CENTER); Ui.fitText(cls,11,15,1);
+        LinearLayout.LayoutParams clp=new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,38));
+        clp.setMargins(0,Ui.dp(this,3),0,Ui.dp(this,3));
+        root.addView(cls,clp);
+
+        depthInfo=Ui.text(this,"— m",13,Color.rgb(225,192,109));
+        depthInfo.setGravity(Gravity.CENTER);Ui.fitText(depthInfo,11,14,1);
+        root.addView(depthInfo,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,38)));
+
+        LinearLayout modes=new LinearLayout(this);
+        normalMode=Ui.button(this,"NORMAL",true);
+        gprMode=Ui.button(this,"GPR GÖRÜNÜM",false);
+        normalMode.setOnClickListener(v->switchMode(false));
+        gprMode.setOnClickListener(v->switchMode(true));
+        modes.addView(normalMode,new LinearLayout.LayoutParams(0,Ui.dp(this,42),1));
+        modes.addView(gprMode,new LinearLayout.LayoutParams(0,Ui.dp(this,42),1));
+        root.addView(modes);
+        ultrasound = new UltrasoundView(this); ultrasound.setPalette(Prefs.palette(this));ultrasound.setGain(liveGain);
+        root.addView(ultrasound,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,0,1));
+
+        HorizontalScrollView ps = new HorizontalScrollView(this); ps.setHorizontalScrollBarEnabled(false);
+        PaletteStripView palettes = new PaletteStripView(this); palettes.setListener(p->{Prefs.setPalette(this,p);ultrasound.setPalette(p);});
+        ps.addView(palettes,new HorizontalScrollView.LayoutParams(Ui.dp(this, ColorMaps.COUNT*92),Ui.dp(this,52)));
+        root.addView(ps,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,54)));
+
+        LinearLayout gainRow=new LinearLayout(this);gainRow.setGravity(Gravity.CENTER_VERTICAL);
+        gainLabel=Ui.text(this,String.format(java.util.Locale.US,"Kazanç %.1fx",liveGain),12,Color.WHITE);Ui.fitText(gainLabel,10,12,1);
+        SeekBar gainSeek=new SeekBar(this);gainSeek.setMax(28);gainSeek.setProgress(Math.round((liveGain-.2f)*10));
+        gainSeek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
+            public void onProgressChanged(SeekBar v,int progress,boolean user){
+                liveGain=.2f+progress*.1f;ultrasound.setGain(liveGain);Prefs.setAnomalyGain(LiveScanActivity.this,liveGain);
+                gainLabel.setText(String.format(java.util.Locale.US,"Kazanç %.1fx",liveGain));
+            }
+            public void onStartTrackingTouch(SeekBar v){}public void onStopTrackingTouch(SeekBar v){}
+        });
+        gainRow.addView(gainLabel,new LinearLayout.LayoutParams(Ui.dp(this,110),Ui.dp(this,40)));
+        gainRow.addView(gainSeek,new LinearLayout.LayoutParams(0,Ui.dp(this,40),1));
+        root.addView(gainRow,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,44)));
+        LinearLayout bar = new LinearLayout(this); bar.setGravity(Gravity.CENTER);
+        liveToggle = Ui.button(this,"DURDUR",true);
+        Button zero = Ui.button(this,"SIFIRLA",false);
+        Button clear = Ui.button(this,"TEMİZLE",false);
+        liveToggle.setOnClickListener(v->toggleLive());
+        zero.setOnClickListener(v->manualZero());
+        clear.setOnClickListener(v->ultrasound.clear());
+        bar.addView(liveToggle,Ui.weight(1)); bar.addView(zero,Ui.weight(1)); bar.addView(clear,Ui.weight(1));
+        root.addView(bar,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,56)));
+
+        setContentView(root); Ui.applySafeInsets(this,root); refreshConnection(); updateLiveButton();
+    }
+
+    private void switchMode(boolean gpr){
+        gprStyle=gpr; ultrasound.setGprStyle(gpr);
+        normalMode.setText(gpr?"NORMAL":"● NORMAL");
+        gprMode.setText(gpr?"● GPR GÖRÜNÜM":"GPR GÖRÜNÜM");
+    }
+
+    private void refreshConnection(){
+        if(connectionBox==null)return;
+        boolean ok=BluetoothClient.isConnected();
+        connectionBox.setText(ok?"BAĞLI • "+BluetoothClient.connectedName():"BLUETOOTH BAĞLI DEĞİL");
+        connectionBox.setTextColor(ok?Color.rgb(4,20,18):Color.WHITE);
+        connectionBox.setBackground(Ui.bg(ok?Color.rgb(55,224,110):Color.rgb(185,48,48),12,this));
+    }
+
+    private void updateLiveButton(){
+        if(liveToggle==null)return;
+        liveToggle.setText(liveRunning?"DURDUR":"BAŞLAT");
+        liveToggle.setTextColor(liveRunning?Color.BLACK:Color.WHITE);
+        liveToggle.setBackground(Ui.bg(liveRunning?Color.rgb(35,214,176):Color.rgb(23,42,54),10,this));
+    }
+
+    private void startLiveIfPossible(){
+        if(!wantLive || liveRunning || !BluetoothClient.isConnected())return;
+        // ESP32 varsayılan olarak 20 ms gönderir; RATE komutu firmware ile senkron tutar.
+        bt.send("RATE=20\n");
+        if(bt.send("LIVE_START\n")){
+            liveRunning=true;
+            updateLiveButton();
+        }
+    }
+
+    private void toggleLive(){
+        if(!BluetoothClient.isConnected()){
+            Toast.makeText(this,"Bluetooth bağlantısı yok",Toast.LENGTH_SHORT).show();
+            bt.pickPaired(this); return;
+        }
+        if(liveRunning){
+            wantLive=false;
+            if(bt.send("LIVE_STOP\n")){
+                liveRunning=false;
+                updateLiveButton();
+                Toast.makeText(this,"Canlı tarama durduruldu",Toast.LENGTH_SHORT).show();
+            }
+        }else{
+            wantLive=true;
+            autoZeroDone=false; ref.clear();
+            startLiveIfPossible();
+            Toast.makeText(this,"Canlı tarama başlatıldı",Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    /** SIFIRLA'dan sonra ilk YENİ paket ortam referansı olur; eski paketi kullanmaz. */
+    private void manualZero() {
+        autoZeroDone=false; ref.clear();
+        if(depthInfo!=null)depthInfo.setText("— m");
+        Toast.makeText(this,"Sıradaki yeni sinyal ortam referansı alınacak",Toast.LENGTH_SHORT).show();
+    }
+
+    @Override public void onFrame(SensorFrame f){
+        if(f==null || !liveRunning)return;
+        if(replayToIgnore!=null && f==replayToIgnore){ replayToIgnore=null; return; }
+        replayToIgnore=null;
+        float signal=f.signal();
+        if(Float.isNaN(signal)||Float.isInfinite(signal)||signal<0f||signal>1023f)return;
+        float z=ReferenceModel.normalize(signal);
+        SensorFrame nf=f.hasXYZC?new SensorFrame(f.x,f.y,z,f.c):new SensorFrame(z);
+
+        synchronized(queueLock){
+            while(pending.size()>=MAX_PENDING)pending.removeFirst();
+            pending.addLast(nf);
+            if(!flushScheduled){
+                flushScheduled=true;
+                ui.postDelayed(flushRunnable,UI_FRAME_MS);
+            }
+        }
+    }
+
+    private final Runnable flushRunnable=new Runnable(){
+        @Override public void run(){
+            ArrayList<SensorFrame> batch=new ArrayList<>();
+            synchronized(queueLock){
+                while(!pending.isEmpty())batch.add(pending.removeFirst());
+                flushScheduled=false;
+            }
+            if(batch.isEmpty())return;
+
+            ArrayList<SensorFrame> visualFrames=new ArrayList<>(batch.size());
+            ArrayList<Float> visualDeltas=new ArrayList<>(batch.size());
+            SensorFrame newest=null;
+
+            for(SensorFrame nf:batch){
+                if(nf==null)continue;
+                float z=nf.signal();
+                last=nf; newest=nf;
+                if(!autoZeroDone){
+                    ref.zero(z); autoZeroDone=true;
+                    if(depthInfo!=null)depthInfo.setText("— m");
+                    continue;
+                }
+                visualFrames.add(nf);
+                visualDeltas.add(ref.visualDelta(z));
+            }
+
+            if(!visualFrames.isEmpty())ultrasound.addBatch(visualFrames,visualDeltas);
+
+            if(newest!=null){
+                String k=ref.classify(newest.signal()); cls.setText(k);
+                ReferenceInverseDepth.Reading m=ReferenceInverseDepth.measure(newest.signal(),ref.reference(),Prefs.gradiometerDepthFactor(LiveScanActivity.this));
+                if(depthInfo!=null){
+                    String measured=m.anomaly&&Float.isFinite(m.meters)
+                      ? String.format(java.util.Locale.US,"≈ %.2f m",m.meters)
+                      : String.format(java.util.Locale.US,"— m");
+                    depthInfo.setText(measured);
+                }
+                cls.setTextColor(k.startsWith("NEGATİF")?Color.rgb(72,155,255):k.startsWith("POZİTİF")?Color.rgb(255,82,48):Color.rgb(65,225,112));
+            }
+
+            synchronized(queueLock){
+                if(!pending.isEmpty()&&!flushScheduled){
+                    flushScheduled=true;
+                    ui.postDelayed(this,UI_FRAME_MS);
+                }
+            }
+        }
+    };
+
+    @Override public void onState(String s){
+        runOnUiThread(()->{
+            refreshConnection();
+            if(!BluetoothClient.isConnected()){
+                liveRunning=false;
+                updateLiveButton();
+            }else startLiveIfPossible();
+        });
+    }
+}

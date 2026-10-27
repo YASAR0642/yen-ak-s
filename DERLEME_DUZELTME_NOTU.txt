@@ -1,0 +1,1 @@
+v3.9.8 GitHub hatasi: Eski GradiometerCalibrationDialog.java kaldirildi ve iki ekrandaki cagrilari temizlendi. Yeni 10 katlik kalibrasyon geri eklenmedi. GitHub uzerinde APK derlemesini yeniden calistirin. Tam APK derlemesi yerel olarak yapilmadi.

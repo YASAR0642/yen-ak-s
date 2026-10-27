@@ -1,0 +1,14 @@
+KTD 3D ANALYZER v3.9.8 - 27.10.2026
+
+- WhatsApp ve Dosyalar'dan gelen .sgy/.segy isimli SEG-Y dosyalari GPR ekranina aktarilir.
+- SEG-Y binary-header kontroluyle ismi farkli kayitlar da denenir. Desteklenen tum varyantlar garanti degildir.
+- Ayarlar menusu gradyometre derinlik kalibrasyon karti kaldirildi.
+- Eski kayitli manuel kalibrasyon katsayisi artik kullanilmiyor.
+- Ters-sinyal gorsel mesafe sabiti 0.50 yerine 0.05 oldu. Bu 10x azaltma fiziksel derinlik kalibrasyonunun yerini TUTMAZ.
+- Canli taramada NORMAL ve GPR GORUNUM butonlari eklendi.
+- Her iki gorunum de ayni gradyometre verisini gosterir; GPR GORUNUM gercek radar SGY izi uretmez.
+- Canli ekrandan REF/Z/deneysel yazilari kaldirildi, ekranda metre degeri birakildi.
+- Yumusak bitmap enterpolasyonu ile bloklu bantlar azaltildi.
+- Aktivasyon ve yatay GPR konsolu korundu.
+
+TEST DURUMU: Kaynak degisikligi ve ZIP kontrolu yapildi. Bu ortamda Android SDK/Gradle ile APK derlemesi ve telefon denemesi yapilamadi.

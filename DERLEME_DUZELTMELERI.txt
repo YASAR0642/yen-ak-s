@@ -1,0 +1,4 @@
+KTD v3.9.7 GitHub Java compile fixes
+LiveGprActivity: antennaButton tanimi düzeltildi.
+LiveScanActivity: ic Runnable icinden dogru Activity Context kullanildi.
+Derleme GitHub Actions uzerinden dogrulanmalidir.
