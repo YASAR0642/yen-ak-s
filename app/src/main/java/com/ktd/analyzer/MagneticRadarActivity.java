@@ -37,7 +37,7 @@ public final class MagneticRadarActivity extends Activity implements BluetoothCl
     private final ArrayList<Float> playback=new ArrayList<>();
     private boolean fileMode=false,playingFile=false,previewShowing=false;
     private int playPos=0;
-    private final Runnable playTick=new Runnable(){@Override public void run(){if(!playingFile)return;int n=0;while(n<3&&playPos<playback.size()){appendDelta(playback.get(playPos++),false);n++;}if(playPos>=playback.size()){playingFile=false;startButton.setText("BAŞLAT");}else playbackHandler.postDelayed(this,32);}};
+    private final Runnable playTick=new Runnable(){@Override public void run(){if(!playingFile)return;int n=0;while(n<15&&playPos<playback.size()){appendDelta(playback.get(playPos++),false);n++;}if(playPos>=playback.size()){playingFile=false;startButton.setText("BAŞLAT");}else playbackHandler.postDelayed(this,16);}};
     private BluetoothClient bluetooth;
     private final ReferenceModel reference=new ReferenceModel();
     private MagneticRadargramView radar;
@@ -51,6 +51,8 @@ public final class MagneticRadarActivity extends Activity implements BluetoothCl
     private final ArrayList<Float> captured=new ArrayList<>();
     private long sequence=0;
     private float baseline=0,slowBase=0,fastBase=0,lastDelta=0;
+    private float smoothedAnomaly=0, featurePolarity=0, featureEnergy=0;
+    private int featureKind=0, featureStep=0, featureSpan=0;
 
     @Override public void onCreate(Bundle b){super.onCreate(b);setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);bluetooth=new BluetoothClient(this);build();}
     private int dp(int n){return Ui.dp(this,n);}    
@@ -80,13 +82,13 @@ public final class MagneticRadarActivity extends Activity implements BluetoothCl
         body.addView(center,new LinearLayout.LayoutParams(0,-1,17));
 
         LinearLayout controls=new LinearLayout(this);controls.setOrientation(LinearLayout.VERTICAL);
-        startButton=button("BAŞLAT");startButton.setOnClickListener(v->{if(fileMode){if(playback.isEmpty())return;if(previewShowing||playPos>=playback.size()){radar.clear();sequence=0;baseline=slowBase=fastBase=lastDelta=0;playPos=0;previewShowing=false;}playingFile=!playingFile;if(playingFile){startButton.setText("DURAKLAT");playbackHandler.post(playTick);}else{playbackHandler.removeCallbacks(playTick);startButton.setText("DEVAM");}return;}if(!BluetoothClient.isConnected()){Toast.makeText(this,"Bluetooth bağlantısı gerekli",Toast.LENGTH_SHORT).show();return;}bluetooth.send("LIVE_START\n");running=true;startButton.setText("ÇALIŞIYOR");});add(controls,startButton);
+        startButton=button("BAŞLAT");startButton.setOnClickListener(v->{if(fileMode){if(playback.isEmpty())return;if(previewShowing||playPos>=playback.size()){radar.clear();sequence=0;baseline=slowBase=fastBase=lastDelta=0;smoothedAnomaly=featurePolarity=featureEnergy=0;featureKind=featureStep=featureSpan=0;playPos=0;previewShowing=false;}playingFile=!playingFile;if(playingFile){startButton.setText("DURAKLAT");playbackHandler.post(playTick);}else{playbackHandler.removeCallbacks(playTick);startButton.setText("DEVAM");}return;}if(!BluetoothClient.isConnected()){Toast.makeText(this,"Bluetooth bağlantısı gerekli",Toast.LENGTH_SHORT).show();return;}bluetooth.send("LIVE_START\n");running=true;startButton.setText("ÇALIŞIYOR");});add(controls,startButton);
         Button stop=button("DURDUR");stop.setOnClickListener(v->{if(fileMode){playingFile=false;playbackHandler.removeCallbacks(playTick);playPos=0;preview();}else{bluetooth.send("LIVE_STOP\n");running=false;}startButton.setText("BAŞLAT");});add(controls,stop);
         Button open=button("DOSYA AÇ");open.setOnClickListener(v->open());add(controls,open);
         Button save=button("KAYDET");save.setOnClickListener(v->save());add(controls,save);
         Button color=button("RENK");color.setOnClickListener(v->{palette=(palette+1)%ColorMaps.COUNT;radar.setPalette(palette);color.setText("RENK\n"+(palette+1)+"/"+ColorMaps.COUNT);panels.invalidate();});add(controls,color);
         Button filter=button("MİNERAL\nKAPALI");filter.setOnClickListener(v->{mineral=!mineral;filter.setText(mineral?"MİNERAL\nAÇIK":"MİNERAL\nKAPALI");});add(controls,filter);
-        Button reset=button("SIFIRLA");reset.setOnClickListener(v->{fileMode=false;playingFile=false;previewShowing=false;playbackHandler.removeCallbacks(playTick);playback.clear();playPos=0;reference.clear();zeroed=false;baseline=0;slowBase=0;fastBase=0;lastDelta=0;sequence=0;radar.clear();panels.invalidate();synchronized(captured){captured.clear();}});add(controls,reset);
+        Button reset=button("SIFIRLA");reset.setOnClickListener(v->{fileMode=false;playingFile=false;previewShowing=false;playbackHandler.removeCallbacks(playTick);playback.clear();playPos=0;reference.clear();zeroed=false;baseline=0;slowBase=0;fastBase=0;lastDelta=0;smoothedAnomaly=featurePolarity=featureEnergy=0;featureKind=featureStep=featureSpan=0;sequence=0;radar.clear();panels.invalidate();synchronized(captured){captured.clear();}});add(controls,reset);
         body.addView(controls,new LinearLayout.LayoutParams(0,-1,16));
         root.addView(body,new LinearLayout.LayoutParams(-1,0,1));
         setContentView(root);Ui.applySafeInsets(this,root);updateStatus();
@@ -94,7 +96,7 @@ public final class MagneticRadarActivity extends Activity implements BluetoothCl
 
     private void updateStatus(){if(status==null)return;boolean ok=BluetoothClient.isConnected();status.setText(ok?"● BLUETOOTH\nBAĞLI":"○ BLUETOOTH\nYOK");status.setBackgroundColor(ok?Color.rgb(45,180,95):Color.rgb(104,50,54));}
     @Override public void onState(String s){runOnUiThread(this::updateStatus);}    
-    @Override protected void onStart(){super.onStart();bluetooth.activate();if(!fileMode&&BluetoothClient.isConnected()){bluetooth.send("RATE=20\n");bluetooth.send("LIVE_START\n");running=true;}updateStatus();}
+    @Override protected void onStart(){super.onStart();bluetooth.activate();if(!fileMode&&BluetoothClient.isConnected()){bluetooth.send("RATE=100\n");bluetooth.send("LIVE_START\n");running=true;}updateStatus();}
     @Override protected void onStop(){playingFile=false;playbackHandler.removeCallbacks(playTick);if(BluetoothClient.isConnected())bluetooth.send("LIVE_STOP\n");running=false;bluetooth.release();super.onStop();}
 
     private static double ricker(double x,double mu,double sigma){ double t=(x-mu)/Math.max(1e-6,sigma); double t2=t*t; return (1.0-t2)*Math.exp(-0.5*t2); }
@@ -106,30 +108,105 @@ public final class MagneticRadarActivity extends Activity implements BluetoothCl
     }
     private void appendDelta(float delta,boolean store){
         if(store){synchronized(captured){captured.add(delta);}}
-            baseline=baseline*.988f+delta*.012f; slowBase=slowBase*.955f+delta*.045f; fastBase=fastBase*.70f+delta*.30f;
-            float driftRemoved=mineral?delta-baseline:delta; float broad=mineral?slowBase-baseline:slowBase; float edge=fastBase-lastDelta; lastDelta=fastBase;
-            float strengthened=driftRemoved+(boost-1f)*Math.signum(broad)*Math.max(0f,Math.abs(broad)-1f);
-            double energy=Math.min(1.0,Math.abs(broad)/28.0); double edgeEnergy=Math.min(1.0,Math.abs(edge)/18.0);
-            // A GPR-like visual profile from magnetic data: multiple band-limited wavelets,
-            // not a real electromagnetic travel-time trace.
-            double baseDepth=70 + energy*90; double split=18 + edgeEnergy*28; double sigma1=7 + energy*10; double sigma2=10 + edgeEnergy*12;
-            short[] section=new short[256];
-            for(int i=0;i<section.length;i++){
-                double y=i;
-                double amp=0;
-                amp += strengthened*180*ricker(y,baseDepth,sigma1);
-                amp += strengthened*95*ricker(y,baseDepth+split,sigma2);
-                amp += (-strengthened)*65*ricker(y,Math.max(24,baseDepth-split*.65),sigma1*1.15);
-                amp += edge*120*ricker(y,40+edgeEnergy*45,6+edgeEnergy*7);
-                amp += Math.sin((y/256.0)*28.0 + sequence*0.12)*10*Math.exp(-y/240.0); // subtle layered texture
-                amp *= (0.92 + (y/255.0)*0.55);
-                if(Math.abs(amp)<2.0) amp=0;
-                section[i]=(short)Math.max(Short.MIN_VALUE,Math.min(Short.MAX_VALUE,Math.round(amp)));
+        baseline=baseline*.988f+delta*.012f;
+        slowBase=slowBase*.955f+delta*.045f;
+        fastBase=fastBase*.70f+delta*.30f;
+        float driftRemoved=mineral?delta-baseline:delta;
+        float broad=mineral?slowBase-baseline:slowBase;
+        float edge=fastBase-lastDelta;
+        lastDelta=fastBase;
+        float strengthened=driftRemoved+(boost-1f)*Math.signum(broad)*Math.max(0f,Math.abs(broad)-1f);
+        double energy=Math.min(1.0,Math.abs(broad)/28.0);
+        double edgeEnergy=Math.min(1.0,Math.abs(edge)/18.0);
+
+        // Feature tracker: sustained negative anomaly => void-like hyperbola,
+        // sustained positive anomaly => metal/cup-like symmetric downward shape.
+        float detect=mineral?broad:strengthened;
+        smoothedAnomaly=smoothedAnomaly*.72f+detect*.28f;
+        int desiredKind=0;
+        if(Math.abs(smoothedAnomaly)>=3.2f) desiredKind=smoothedAnomaly<0?-1:1;
+        if(desiredKind!=0){
+            if(featureKind!=desiredKind || featureStep>=featureSpan){
+                featureKind=desiredKind;
+                featureStep=0;
+                featureSpan=18+(int)Math.round(energy*28 + Math.min(18.0,Math.abs(smoothedAnomaly)));
+                featureEnergy=(float)Math.max(0.22,Math.min(1.0,energy));
+                featurePolarity=smoothedAnomaly;
+            }else{
+                featureStep++;
+                featureEnergy=Math.max(featureEnergy*.85f,(float)energy);
+                featurePolarity=featurePolarity*.70f+smoothedAnomaly*.30f;
             }
-        radar.add(new GprProtocol.Trace(sequence++,section));panels.invalidate();
+        }else if(featureKind!=0){
+            featureStep++;
+            if(featureStep>=featureSpan){
+                featureKind=0; featureStep=0; featureSpan=0; featureEnergy=0; featurePolarity=0;
+            }
+        }
+
+        final int groundLimit=32; // ~0.50 m on the 0-4 MT* display ruler.
+        final double xNorm=(featureSpan>1)?(((featureStep/(double)(featureSpan-1))*2.0)-1.0):0.0;
+        short[] section=new short[256];
+        for(int i=0;i<section.length;i++){
+            double y=i;
+            double amp=0;
+
+            // Ground/top-soil band (0.00-0.50): stable layered response, suppress anomalies.
+            double layered=(Math.sin((y/256.0)*22.0 + sequence*0.22)*7 + Math.sin((y/256.0)*41.0 + sequence*0.07)*3.5)*Math.exp(-y/155.0);
+            if(y<groundLimit){
+                amp += 18 + layered*1.7;
+                amp += strengthened*10*ricker(y,groundLimit*0.55,5.0);
+                section[i]=(short)Math.max(Short.MIN_VALUE,Math.min(Short.MAX_VALUE,Math.round(amp)));
+                continue;
+            }
+
+            // Background continuity after top-soil.
+            amp += layered*0.55;
+            amp += strengthened*22*ricker(y,groundLimit+10+energy*20,8+energy*5);
+            amp += edge*18*ricker(y,groundLimit+8+edgeEnergy*12,6+edgeEnergy*4);
+
+            if(featureKind==-1){
+                // Void-like continuous anomaly: nested hyperbolas whose apex depth follows anomaly strength.
+                double apex=groundLimit+12 + featureEnergy*78;
+                double curve=24 + featureEnergy*84;
+                double mu=apex + curve*xNorm*xNorm;
+                double split=7 + featureEnergy*11;
+                double mag=Math.max(10.0,Math.abs(featurePolarity)*26.0);
+                amp += -mag*ricker(y,mu,5.0+featureEnergy*4.0);
+                amp +=  mag*0.62*ricker(y,mu+split,7.0+featureEnergy*5.0);
+                amp +=  mag*0.34*ricker(y,mu+split*1.9,9.0+featureEnergy*6.0);
+            }else if(featureKind==1){
+                // Metal / cup-like anomaly: symmetric shapes extending downward.
+                double apex=groundLimit+9 + featureEnergy*56;
+                double bowl=12 + featureEnergy*24;
+                double mag=Math.max(12.0,Math.abs(featurePolarity)*24.0);
+                for(int layer=0;layer<3;layer++){
+                    double mu=apex + layer*18 + (bowl + layer*10)*xNorm*xNorm;
+                    double sig=4.8 + layer*1.7 + featureEnergy*2.8;
+                    amp += mag*(1.0-layer*0.16)*ricker(y,mu,sig);
+                    amp += -mag*(0.46-layer*0.08)*ricker(y,mu+6+layer*4,sig*1.25);
+                }
+                amp += mag*0.18*Math.exp(-Math.abs(xNorm)*2.5)*ricker(y,apex+42,15+featureEnergy*8);
+            }else{
+                // No persistent target: soft banded response only.
+                double baseDepth=groundLimit+18 + energy*76;
+                double split=14 + edgeEnergy*18;
+                double sigma1=7 + energy*7;
+                double sigma2=10 + edgeEnergy*9;
+                amp += strengthened*42*ricker(y,baseDepth,sigma1);
+                amp += strengthened*22*ricker(y,baseDepth+split,sigma2);
+                amp += (-strengthened)*14*ricker(y,Math.max(groundLimit+6,baseDepth-split*.65),sigma1*1.15);
+            }
+
+            amp *= (0.86 + (y/255.0)*0.42);
+            if(Math.abs(amp)<1.7) amp=0;
+            section[i]=(short)Math.max(Short.MIN_VALUE,Math.min(Short.MAX_VALUE,Math.round(amp)));
+        }
+        radar.add(new GprProtocol.Trace(sequence++,section));
+        panels.invalidate();
     }
     private void preview(){
-        radar.clear();sequence=0;baseline=slowBase=fastBase=lastDelta=0;
+        radar.clear();sequence=0;baseline=slowBase=fastBase=lastDelta=0;smoothedAnomaly=featurePolarity=featureEnergy=0;featureKind=featureStep=featureSpan=0;
         // Preview the full recording at no more than 180 representative traces.
         int total=playback.size();if(total==0)return;
         int shown=Math.min(180,total);
