@@ -16,6 +16,13 @@ import com.ktd.analyzer.view.MagneticRadargramView;
 import com.ktd.analyzer.view.MagneticTracePanelsView;
 import com.ktd.analyzer.view.ColorMaps;
 import java.io.OutputStream;
+import java.io.InputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import android.os.Handler;
+import android.os.Looper;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -24,7 +31,13 @@ import java.util.Locale;
 
 /** Magnetic survey visualisation with CANLI GPR-like controls, used only in 3D live scan > GPR görünüm. */
 public final class MagneticRadarActivity extends Activity implements BluetoothClient.Listener {
-    private static final int SAVE=9914;
+    private static final int SAVE=9914, OPEN=9915;
+    private static final int MAGIC=0x4B4D4752; // KMGR
+    private final Handler playbackHandler=new Handler(Looper.getMainLooper());
+    private final ArrayList<Float> playback=new ArrayList<>();
+    private boolean fileMode=false,playingFile=false,previewShowing=false;
+    private int playPos=0;
+    private final Runnable playTick=new Runnable(){@Override public void run(){if(!playingFile)return;int n=0;while(n<3&&playPos<playback.size()){appendDelta(playback.get(playPos++),false);n++;}if(playPos>=playback.size()){playingFile=false;startButton.setText("BAŞLAT");}else playbackHandler.postDelayed(this,32);}};
     private BluetoothClient bluetooth;
     private final ReferenceModel reference=new ReferenceModel();
     private MagneticRadargramView radar;
@@ -33,15 +46,15 @@ public final class MagneticRadarActivity extends Activity implements BluetoothCl
     private Button startButton;
     private boolean running=false,zeroed=false,mineral=false;
     private float gain=1f, boost=2f;
-    private int palette=1,antenna=300,timeIndex=3;
-    private final double[] windows={30,60,100,150,200,300,500};
+    private int palette=1;
+    
     private final ArrayList<Float> captured=new ArrayList<>();
     private long sequence=0;
     private float baseline=0,slowBase=0,fastBase=0,lastDelta=0;
 
     @Override public void onCreate(Bundle b){super.onCreate(b);setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);bluetooth=new BluetoothClient(this);build();}
     private int dp(int n){return Ui.dp(this,n);}    
-    private Button button(String name){Button b=Ui.button(this,name,false);b.setTextSize(10);b.setAllCaps(false);b.setLines(2);b.setGravity(Gravity.CENTER);b.setPadding(dp(3),dp(3),dp(3),dp(3));return b;}
+    private Button button(String name){Button b=Ui.button(this,name,false);b.setTextSize(11);b.setAllCaps(false);b.setSingleLine(false);b.setMaxLines(2);b.setGravity(Gravity.CENTER);b.setPadding(dp(2),0,dp(2),0);b.setMinHeight(0);b.setMinimumHeight(0);return b;}
     private TextView text(String s,int size){TextView t=Ui.text(this,s,size,Color.WHITE);t.setGravity(Gravity.CENTER);return t;}
     private void add(LinearLayout p,Button b){p.addView(b,new LinearLayout.LayoutParams(-1,0,1));}
 
@@ -54,7 +67,7 @@ public final class MagneticRadarActivity extends Activity implements BluetoothCl
         root.addView(head,new LinearLayout.LayoutParams(-1,dp(44)));
 
         LinearLayout body=new LinearLayout(this);body.setOrientation(LinearLayout.HORIZONTAL);
-        radar=new MagneticRadargramView(this);radar.setGain(gain);radar.setPalette(palette);radar.setEstimatedTime(true);radar.setTimeWindowNs(windows[timeIndex]);
+        radar=new MagneticRadargramView(this);radar.setGain(gain);radar.setPalette(palette);radar.setEstimatedTime(true);radar.setTimeWindowNs(60);
         body.addView(radar,new LinearLayout.LayoutParams(0,-1,68));
 
         LinearLayout center=new LinearLayout(this);center.setOrientation(LinearLayout.VERTICAL);center.setBackgroundColor(Color.rgb(6,16,23));
@@ -67,30 +80,32 @@ public final class MagneticRadarActivity extends Activity implements BluetoothCl
         body.addView(center,new LinearLayout.LayoutParams(0,-1,17));
 
         LinearLayout controls=new LinearLayout(this);controls.setOrientation(LinearLayout.VERTICAL);
-        startButton=button("BAŞLAT");startButton.setOnClickListener(v->{if(!BluetoothClient.isConnected()){Toast.makeText(this,"Bluetooth bağlantısı gerekli",Toast.LENGTH_SHORT).show();return;}bluetooth.send("LIVE_START\n");running=true;startButton.setText("ÇALIŞIYOR");});add(controls,startButton);
-        Button stop=button("DUR");stop.setOnClickListener(v->{bluetooth.send("LIVE_STOP\n");running=false;startButton.setText("BAŞLAT");});add(controls,stop);
+        startButton=button("BAŞLAT");startButton.setOnClickListener(v->{if(fileMode){if(playback.isEmpty())return;if(previewShowing||playPos>=playback.size()){radar.clear();sequence=0;baseline=slowBase=fastBase=lastDelta=0;playPos=0;previewShowing=false;}playingFile=!playingFile;if(playingFile){startButton.setText("DURAKLAT");playbackHandler.post(playTick);}else{playbackHandler.removeCallbacks(playTick);startButton.setText("DEVAM");}return;}if(!BluetoothClient.isConnected()){Toast.makeText(this,"Bluetooth bağlantısı gerekli",Toast.LENGTH_SHORT).show();return;}bluetooth.send("LIVE_START\n");running=true;startButton.setText("ÇALIŞIYOR");});add(controls,startButton);
+        Button stop=button("DURDUR");stop.setOnClickListener(v->{if(fileMode){playingFile=false;playbackHandler.removeCallbacks(playTick);playPos=0;preview();}else{bluetooth.send("LIVE_STOP\n");running=false;}startButton.setText("BAŞLAT");});add(controls,stop);
+        Button open=button("DOSYA AÇ");open.setOnClickListener(v->open());add(controls,open);
         Button save=button("KAYDET");save.setOnClickListener(v->save());add(controls,save);
-        Button time=button("ZAMAN\n150 ns");time.setOnClickListener(v->{timeIndex=(timeIndex+1)%windows.length;radar.setTimeWindowNs(windows[timeIndex]);time.setText(String.format(Locale.US,"ZAMAN\n%.0f ns",windows[timeIndex]));panels.invalidate();});add(controls,time);
         Button color=button("RENK");color.setOnClickListener(v->{palette=(palette+1)%ColorMaps.COUNT;radar.setPalette(palette);color.setText("RENK\n"+(palette+1)+"/"+ColorMaps.COUNT);panels.invalidate();});add(controls,color);
-        Button ant=button("ANTEN\n300");ant.setOnClickListener(v->{int[] arr={100,200,300,400,500,800};int i=0;while(i<arr.length&&arr[i]!=antenna)i++;antenna=arr[(i+1)%arr.length];radar.setAntennaMhz(antenna);ant.setText("ANTEN\n"+antenna);});add(controls,ant);
         Button filter=button("MİNERAL\nKAPALI");filter.setOnClickListener(v->{mineral=!mineral;filter.setText(mineral?"MİNERAL\nAÇIK":"MİNERAL\nKAPALI");});add(controls,filter);
-        Button boostButton=button("ANOMALİ\n2.0×");boostButton.setOnClickListener(v->{boost=boost>=5f?1f:boost+.5f;boostButton.setText(String.format(Locale.US,"ANOMALİ\n%.1f×",boost));});add(controls,boostButton);
-        Button reset=button("SIFIRLA");reset.setOnClickListener(v->{reference.clear();zeroed=false;baseline=0;slowBase=0;fastBase=0;lastDelta=0;sequence=0;radar.clear();panels.invalidate();synchronized(captured){captured.clear();}});add(controls,reset);
-        body.addView(controls,new LinearLayout.LayoutParams(0,-1,15));
+        Button reset=button("SIFIRLA");reset.setOnClickListener(v->{fileMode=false;playingFile=false;previewShowing=false;playbackHandler.removeCallbacks(playTick);playback.clear();playPos=0;reference.clear();zeroed=false;baseline=0;slowBase=0;fastBase=0;lastDelta=0;sequence=0;radar.clear();panels.invalidate();synchronized(captured){captured.clear();}});add(controls,reset);
+        body.addView(controls,new LinearLayout.LayoutParams(0,-1,16));
         root.addView(body,new LinearLayout.LayoutParams(-1,0,1));
         setContentView(root);Ui.applySafeInsets(this,root);updateStatus();
     }
 
     private void updateStatus(){if(status==null)return;boolean ok=BluetoothClient.isConnected();status.setText(ok?"● BLUETOOTH\nBAĞLI":"○ BLUETOOTH\nYOK");status.setBackgroundColor(ok?Color.rgb(45,180,95):Color.rgb(104,50,54));}
     @Override public void onState(String s){runOnUiThread(this::updateStatus);}    
-    @Override protected void onStart(){super.onStart();bluetooth.activate();if(BluetoothClient.isConnected()){bluetooth.send("RATE=20\n");bluetooth.send("LIVE_START\n");running=true;}updateStatus();}
-    @Override protected void onStop(){if(BluetoothClient.isConnected())bluetooth.send("LIVE_STOP\n");running=false;bluetooth.release();super.onStop();}
+    @Override protected void onStart(){super.onStart();bluetooth.activate();if(!fileMode&&BluetoothClient.isConnected()){bluetooth.send("RATE=20\n");bluetooth.send("LIVE_START\n");running=true;}updateStatus();}
+    @Override protected void onStop(){playingFile=false;playbackHandler.removeCallbacks(playTick);if(BluetoothClient.isConnected())bluetooth.send("LIVE_STOP\n");running=false;bluetooth.release();super.onStop();}
 
     private static double ricker(double x,double mu,double sigma){ double t=(x-mu)/Math.max(1e-6,sigma); double t2=t*t; return (1.0-t2)*Math.exp(-0.5*t2); }
 
     @Override public void onFrame(SensorFrame f){if(!running||f==null)return;float v=f.signal();if(!Float.isFinite(v)||v<0||v>1023)return;
         runOnUiThread(()->{if(!running)return;float z=ReferenceModel.normalize(v);if(!zeroed){reference.zero(z);zeroed=true;return;}
-            float delta=reference.visualDelta(z); synchronized(captured){captured.add(delta);}            
+            float delta=reference.visualDelta(z);appendDelta(delta,true);
+        });
+    }
+    private void appendDelta(float delta,boolean store){
+        if(store){synchronized(captured){captured.add(delta);}}
             baseline=baseline*.988f+delta*.012f; slowBase=slowBase*.955f+delta*.045f; fastBase=fastBase*.70f+delta*.30f;
             float driftRemoved=mineral?delta-baseline:delta; float broad=mineral?slowBase-baseline:slowBase; float edge=fastBase-lastDelta; lastDelta=fastBase;
             float strengthened=driftRemoved+(boost-1f)*Math.signum(broad)*Math.max(0f,Math.abs(broad)-1f);
@@ -111,10 +126,39 @@ public final class MagneticRadarActivity extends Activity implements BluetoothCl
                 if(Math.abs(amp)<2.0) amp=0;
                 section[i]=(short)Math.max(Short.MIN_VALUE,Math.min(Short.MAX_VALUE,Math.round(amp)));
             }
-            radar.add(new GprProtocol.Trace(sequence++,section)); panels.invalidate();
-        });
+        radar.add(new GprProtocol.Trace(sequence++,section));panels.invalidate();
     }
+    private void preview(){
+        radar.clear();sequence=0;baseline=slowBase=fastBase=lastDelta=0;
+        // Preview the full recording at no more than 180 representative traces.
+        int total=playback.size();if(total==0)return;
+        int shown=Math.min(180,total);
+        for(int i=0;i<shown;i++){int at=(int)((long)i*total/shown);appendDelta(playback.get(at),false);}
+        playPos=0;previewShowing=true;
+    }
+    private void open(){Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);i.addCategory(Intent.CATEGORY_OPENABLE);i.setType("*/*");i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);startActivityForResult(i,OPEN);}
 
-    private void save(){synchronized(captured){if(captured.isEmpty()){Toast.makeText(this,"Kaydedilecek manyetik ölçüm yok",Toast.LENGTH_SHORT).show();return;}} Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);i.addCategory(Intent.CATEGORY_OPENABLE);i.setType("text/csv");i.putExtra(Intent.EXTRA_TITLE,"KTD_MANYETIK_"+new SimpleDateFormat("yyyyMMdd_HHmmss",Locale.US).format(new Date())+".csv");startActivityForResult(i,SAVE);}    
-    @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(request!=SAVE||result!=RESULT_OK||data==null||data.getData()==null)return;Uri uri=data.getData();ArrayList<Float> copy; synchronized(captured){copy=new ArrayList<>(captured);} new Thread(()->{try(OutputStream out=getContentResolver().openOutputStream(uri)){ if(out==null)throw new java.io.IOException("Kayıt açılamadı"); out.write("index,magnetic_delta,source\n".getBytes(StandardCharsets.UTF_8)); for(int k=0;k<copy.size();k++) out.write(String.format(Locale.US,"%d,%.6f,GRADIOMETER\n",k,copy.get(k)).getBytes(StandardCharsets.UTF_8)); runOnUiThread(()->Toast.makeText(this,"Kayıt tamamlandı",Toast.LENGTH_SHORT).show()); }catch(Exception e){ runOnUiThread(()->Toast.makeText(this,"Kayıt hatası: "+e.getMessage(),Toast.LENGTH_LONG).show()); }}).start(); }
+    private void save(){synchronized(captured){if(captured.isEmpty()){Toast.makeText(this,"Kaydedilecek manyetik ölçüm yok",Toast.LENGTH_SHORT).show();return;}}
+        Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);i.addCategory(Intent.CATEGORY_OPENABLE);i.setType("application/octet-stream");i.putExtra(Intent.EXTRA_TITLE,"KTD_MANYETIK_"+new SimpleDateFormat("yyyyMMdd_HHmmss",Locale.US).format(new Date())+".kmgr");startActivityForResult(i,SAVE);
+    }
+    @Override protected void onActivityResult(int request,int result,Intent data){
+        super.onActivityResult(request,result,data);
+        if(result!=RESULT_OK||data==null||data.getData()==null)return;
+        Uri uri=data.getData();
+        if(request==SAVE){
+            ArrayList<Float> copy; synchronized(captured){copy=new ArrayList<>(captured);}
+            new Thread(()->{try(OutputStream stream=getContentResolver().openOutputStream(uri);DataOutputStream out=new DataOutputStream(new BufferedOutputStream(stream))){
+                out.writeInt(MAGIC);out.writeInt(1);out.writeInt(copy.size());for(Float v:copy)out.writeFloat(v);out.flush();
+                runOnUiThread(()->Toast.makeText(this,"KMGR kaydı tamamlandı",Toast.LENGTH_SHORT).show());
+            }catch(Exception e){runOnUiThread(()->Toast.makeText(this,"Kayıt hatası: "+e.getMessage(),Toast.LENGTH_LONG).show());}}).start();
+        }else if(request==OPEN){
+            new Thread(()->{try(InputStream stream=getContentResolver().openInputStream(uri);DataInputStream in=new DataInputStream(new BufferedInputStream(stream))){
+                if(in.readInt()!=MAGIC)throw new java.io.IOException("KMGR dosyası değil");
+                if(in.readInt()!=1)throw new java.io.IOException("Desteklenmeyen sürüm");
+                int count=in.readInt();if(count<0||count>10000000)throw new java.io.IOException("Geçersiz örnek sayısı");
+                ArrayList<Float> values=new ArrayList<>(count);for(int j=0;j<count;j++){float v=in.readFloat();if(!Float.isFinite(v))throw new java.io.IOException("Geçersiz ölçüm");values.add(v);}
+                runOnUiThread(()->{playingFile=false;playbackHandler.removeCallbacks(playTick);running=false;bluetooth.send("LIVE_STOP\n");fileMode=true;playback.clear();playback.addAll(values);preview();startButton.setText("BAŞLAT");Toast.makeText(this,"Dosya açıldı: "+values.size()+" ölçüm",Toast.LENGTH_SHORT).show();});
+            }catch(Exception e){runOnUiThread(()->Toast.makeText(this,"Dosya açılamadı: "+e.getMessage(),Toast.LENGTH_LONG).show());}}).start();
+        }
+    }
 }

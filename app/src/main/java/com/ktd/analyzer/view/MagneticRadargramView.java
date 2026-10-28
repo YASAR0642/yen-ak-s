@@ -135,8 +135,9 @@ public final class MagneticRadargramView extends View {
             }
             Bitmap bmp=Bitmap.createBitmap(pixels,visibleN,rows,Bitmap.Config.ARGB_8888);
             p.setFilterBitmap(true);p.setStyle(Paint.Style.FILL);
-            // Fill the whole radargram window to avoid a dead black gap before the MT axis.
-            canvas.drawBitmap(bmp,new Rect(0,0,visibleN,rows),new Rect(left,top,left+ww,top+hh),p);
+            // Fixed trace pitch. Old traces leave from left after 180; no rescaling during playback.
+            int drawnW=Math.max(1,Math.round(ww*(visibleN/(float)VISIBLE_TRACES)));
+            canvas.drawBitmap(bmp,new Rect(0,0,visibleN,rows),new Rect(left,top,left+drawnW,top+hh),p);
             bmp.recycle();
         }
         p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(dp*.65f);p.setColor(Color.rgb(85,111,125));

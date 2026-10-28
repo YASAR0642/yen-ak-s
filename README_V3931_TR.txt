@@ -1,0 +1,13 @@
+KTD 3D ANALYZER v3.9.31 - MANYETIK GPR KAYIT VE AKIS
+- Yalnizca MagneticRadarActivity ve MagneticRadargramView degistirildi.
+- ANTEN / ZAMAN / ANOMALI butonlari bu moddan kaldirildi.
+- COM baglantisi zaten ust ekrandan yapilir.
+- DOSYA AC: .kmgr dosyasini okur, tam kaydi ornekleyerek onizler.
+- BASLAT: dosyayi basindan yeniden oynatir; tekrar basinca duraklatir/devam ettirir.
+- DURDUR: dosya modunda tam onizlemeye doner; canli modda taramayi durdurur.
+- KAYDET: ham manyetik sapmayi kendi .kmgr dosya formatinda yazar.
+- .kmgr baslik: KMGR 4-byte magic, int surum 1, int kayit sayisi, IEEE float32 sapmalar.
+- Onceki CSV dosyalari bu oynaticiya aktarilmaz. Birim/derinlik GPR olcumu degildir.
+- Radargram 180 izlik kayan pencere, sabit iz araligi; ekran dolunca soldan kayar.
+- Ayri CANLI GPR ve NORMAL dosyalarina dokunulmadi.
+- Tam Android APK derlemesi ve telefon testi yapilmadi.
