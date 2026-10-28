@@ -62,7 +62,7 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
     private double loadedDxMeters=Double.NaN;
     private int replayPreviewColumns=180;
     private int selectedPalette=1;
-    private static final int REPLAY_FRAME_MS=40;
+    private static final int REPLAY_FRAME_MS=32; // 25% faster playback: 40/1.25
     // Bluetooth input is drained in short batches; display memory stays bounded.
     private static final int MAX_PENDING_MESSAGES=4096;
     private long droppedGprMessages=0;
@@ -149,10 +149,10 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
         LinearLayout lineGain=new LinearLayout(this);lineGain.setGravity(Gravity.CENTER_VERTICAL);
         gainLabel=text("KAZANÇ 1.0×",10);
         lineGain.addView(gainLabel,new LinearLayout.LayoutParams(dp(91),-1));
-        SeekBar slider=new SeekBar(this);slider.setMax(55);slider.setProgress(8);
+        SeekBar slider=new SeekBar(this);slider.setMax(100);slider.setProgress(10);
         slider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
             public void onProgressChanged(SeekBar b,int n,boolean fromUser){
-                gain=.2f+n*.1f;radar.setGain(gain);gainLabel.setText(String.format(Locale.US,"KAZANÇ %.1f×",gain));
+                gain=n*.1f;radar.setGain(gain);gainLabel.setText(String.format(Locale.US,"KAZANÇ %.1f×",gain));
             }
             public void onStartTrackingTouch(SeekBar b){}
             public void onStopTrackingTouch(SeekBar b){}
@@ -184,6 +184,11 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
         LinearLayout paletteRow=new LinearLayout(this);
         paletteRow.addView(colors,new LinearLayout.LayoutParams(-1,dp(36)));
         control.addView(paletteRow,new LinearLayout.LayoutParams(-1,dp(37)));
+        antennaButton=action("ANTEN\n"+antennaMhz+" MHz");
+        antennaButton.setOnClickListener(v->chooseAntenna());
+        LinearLayout antennaRow=new LinearLayout(this);
+        antennaRow.addView(antennaButton,new LinearLayout.LayoutParams(-1,dp(36)));
+        control.addView(antennaRow,new LinearLayout.LayoutParams(-1,dp(37)));
         body.addView(control,weighted(17));
         root.addView(body,new LinearLayout.LayoutParams(-1,0,1));
         footer=text("COM • 0 İZ",10);footer.setGravity(Gravity.CENTER_VERTICAL);
@@ -208,7 +213,7 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
     private void updateFooter(){
         if(footer==null)return;
         String mode=fileMode?(playingFile?"DOSYA OYNATILIYOR":"DOSYA DURDU"):(radar.isDemo()?"DEMO":radar.hasTimeAxis()?"ns":"ÖRNEK");
-        footer.setText(String.format(Locale.forLanguageTag("tr-TR"),"%s  •  %d İZ  •  %s  •  εr=%.0f",fileMode?(replayPosition+"/"+loadedTraces.size()):BluetoothClient.isConnected()?"COM BAĞLI":"COM KAPALI",count,mode,eps));
+        footer.setText(String.format(Locale.forLanguageTag("tr-TR"),"%s  •  %d İZ  •  %s  •  εr=%.0f",fileMode?(replayPosition+"/"+loadedTraces.size()):BluetoothClient.isConnected()?"COM BAĞLI":"COM KAPALI",count,mode,eps)+"  •  ANTEN "+antennaMhz+" MHz");
     }
     private void stopPlayback(){playingFile=false;ui.removeCallbacks(replayTick);}
     private void refreshReplayButtons(){

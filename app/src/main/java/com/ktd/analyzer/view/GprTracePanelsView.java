@@ -25,7 +25,7 @@ public final class GprTracePanelsView extends View {
             case MotionEvent.ACTION_MOVE:
                 if(activePanel>=0){
                     float delta=(e.getX()-startX)/Math.max(1f,getWidth());
-                    gains[activePanel]=Math.max(.2f,Math.min(8f,(float)(startGain*Math.pow(8.0,delta))));
+                    gains[activePanel]=Math.max(0f,Math.min(10f,startGain+delta*10f));
                     invalidate();return true;
                 }
                 return false;

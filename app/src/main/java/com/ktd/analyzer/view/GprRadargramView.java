@@ -37,7 +37,7 @@ public final class GprRadargramView extends View {
     }
     public void clear(){traces.clear();nSamples=0;lastSequence=-1;invalidate();}
     public void resetSession(){clear();dtNs=Double.NaN;dxMeters=Double.NaN;demo=false;maxAbsolute=100;invalidate();}
-    public void setGain(float value){gain=Math.max(.2f,Math.min(6f,value));invalidate();}
+    public void setGain(float value){gain=Math.max(0f,Math.min(10f,value));invalidate();}
     public float getGain(){return gain;}
     public void setEpsilon(double value){epsilonR=Math.max(1,Math.min(50,value));invalidate();}
     public double getEpsilon(){return epsilonR;}
@@ -132,14 +132,14 @@ public final class GprRadargramView extends View {
                 peak=Math.max(8,hist[(int)((hist.length-1)*.96)]);
             }
             int[] pixels=new int[visibleN*rows];
-            double scale=Math.max(1,peak)/gain;
+            double scale=Math.max(1,peak)/Math.max(.0001f,gain);
             for(int x=0;x<visibleN;x++)for(int y=0;y<rows;y++){
                 double a=sampled[x][y];
                 if(hyperbolicContrast){
                     double a0=sampled[Math.max(0,x-1)][y],a1=sampled[Math.min(visibleN-1,x+1)][y];
                     a+=(a-(a0+a1)*.5)*.48;
                 }
-                pixels[y*visibleN+x]=shade(a/scale);
+                pixels[y*visibleN+x]=(gain<=0.0001f ? Color.rgb(31,39,45) : shade(a/scale));
             }
             Bitmap bmp=Bitmap.createBitmap(pixels,visibleN,rows,Bitmap.Config.ARGB_8888);
             p.setFilterBitmap(true);p.setStyle(Paint.Style.FILL);
@@ -169,10 +169,9 @@ public final class GprRadargramView extends View {
         label.setTextAlign(Paint.Align.RIGHT);
         label.setColor(Color.rgb(115,201,240));
         canvas.drawText(hasTimeAxis()?"ns":"ÖRNEK",left-5*dp,top-9*dp,label);
-        if(hasTimeAxis()){
-            label.setTextAlign(Paint.Align.LEFT);
-            // GPR numeric depth scale: no unit label.
-        }
+        label.setTextAlign(Paint.Align.LEFT);
+        label.setColor(Color.rgb(115,201,240));
+        canvas.drawText(hasTimeAxis()?"DERİNLİK":"DERİNLİK --",left+ww+5*dp,top-9*dp,label);
         // Single fixed trace label, no repeated "İz" labels over ns ticks.
         label.setTextAlign(Paint.Align.LEFT);
         label.setColor(Color.rgb(210,224,232));
