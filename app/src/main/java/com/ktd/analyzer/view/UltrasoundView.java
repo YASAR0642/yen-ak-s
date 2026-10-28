@@ -24,6 +24,11 @@ public final class UltrasoundView extends View {
     private float maxAbs = 18f;
     private float displayGain=1f;
     private boolean gprStyle=false;
+    private float broadAnomalyBoost=2f;
+    private boolean mineralFilterEnabled=false;
+    // Magnetic-filter controls do not modify raw sensor samples.
+    public void setBroadAnomalyBoost(float v){ broadAnomalyBoost=Math.max(1f,Math.min(5f,v));invalidate(); }
+    public void setMineralFilterEnabled(boolean v){mineralFilterEnabled=v;invalidate();}
     public void setGprStyle(boolean value){gprStyle=value;invalidate();}
     private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
 
@@ -87,6 +92,35 @@ public final class UltrasoundView extends View {
             // Smoothstep eliminates visible horizontal cell boundaries.
             t=t*t*(3f-2f*t);
             float signal=a+(b-a)*t;
+            // GPR-style view only: derive a low-frequency trend and a smoothed broad
+            // anomaly from measured magnetic samples. NEVER synthesize depth layers.
+            // A trailing window avoids future sample leakage during live acquisition.
+            if(gprStyle){
+                int nearest=(int)Math.floor(age);
+                int window=Math.min(24,count);
+                float baseline=0f, broad=0f;
+                int bn=0, sn=0;
+                for(int k=0;k<window;k++){
+                    int idx=(head-1-Math.min(count-1,nearest+k)+N)%N;
+                    baseline+=d[idx]; bn++;
+                }
+                if(bn>0)baseline/=bn;
+                int smoothWindow=Math.min(9,count);
+                for(int k=0;k<smoothWindow;k++){
+                    int idx=(head-1-Math.min(count-1,nearest+k)+N)%N;
+                    broad+=d[idx]; sn++;
+                }
+                if(sn>0)broad/=sn;
+                float source=signal;
+                // Trend suppression reduces slowly changing geological background,
+                // but can also suppress very large legitimate targets.
+                if(mineralFilterEnabled)source-=baseline*.85f;
+                float broadPart=mineralFilterEnabled?(broad-baseline*.85f):broad;
+                // Noise gate: do not amplify tiny changes near the reference.
+                float noiseGate=Math.max(.8f,maxAbs*.035f);
+                float extra=Math.signum(broadPart)*Math.max(0f,Math.abs(broadPart)-noiseGate);
+                signal=source+(broadAnomalyBoost-1f)*extra;
+            }
             float magnitude=Math.min(1f,Math.abs(signal)*displayGain/Math.max(1f,maxAbs));
             float breadth=.15f+.16f*magnitude;
             for(int x=0;x<cols;x++){

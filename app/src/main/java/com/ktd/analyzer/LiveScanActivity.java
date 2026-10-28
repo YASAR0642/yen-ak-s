@@ -43,6 +43,10 @@ public final class LiveScanActivity extends Activity implements BluetoothClient.
     private Button normalMode,gprMode;
     private TextView depthInfo,gainLabel;
     private float liveGain=1f;
+    // These controls apply ONLY to the magnetic GPR-style visualization.
+    private LinearLayout magneticFilters;
+    private float broadAnomalyBoost=2f;
+    private boolean mineralFilterEnabled=false;
 
     private boolean autoZeroDone = false;
     private boolean liveRunning = false;
@@ -135,6 +139,36 @@ public final class LiveScanActivity extends Activity implements BluetoothClient.
         modes.addView(normalMode,new LinearLayout.LayoutParams(0,Ui.dp(this,42),1));
         modes.addView(gprMode,new LinearLayout.LayoutParams(0,Ui.dp(this,42),1));
         root.addView(modes);
+        magneticFilters=new LinearLayout(this);
+        magneticFilters.setOrientation(LinearLayout.VERTICAL);
+        magneticFilters.setPadding(0,Ui.dp(this,3),0,Ui.dp(this,3));
+        LinearLayout boostRow=new LinearLayout(this);
+        boostRow.setGravity(Gravity.CENTER_VERTICAL);
+        TextView boostLabel=Ui.text(this,"GENİŞ ANOMALİ 2.0×",11,Color.WHITE);
+        SeekBar boostSlider=new SeekBar(this);
+        boostSlider.setMax(8);
+        boostSlider.setProgress(2); // 1.0 + 2 * 0.5 = 2.0x
+        boostSlider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
+            @Override public void onProgressChanged(SeekBar v,int progress,boolean fromUser){
+                broadAnomalyBoost=1f+progress*.5f;
+                boostLabel.setText(String.format(java.util.Locale.US,"GENİŞ ANOMALİ %.1f×",broadAnomalyBoost));
+                if(ultrasound!=null)ultrasound.setBroadAnomalyBoost(broadAnomalyBoost);
+            }
+            @Override public void onStartTrackingTouch(SeekBar v){}
+            @Override public void onStopTrackingTouch(SeekBar v){}
+        });
+        boostRow.addView(boostLabel,new LinearLayout.LayoutParams(Ui.dp(this,150),Ui.dp(this,33)));
+        boostRow.addView(boostSlider,new LinearLayout.LayoutParams(0,Ui.dp(this,33),1));
+        magneticFilters.addView(boostRow);
+        Button mineralToggle=Ui.button(this,"MİNERAL FİLTRESİ: KAPALI",false);
+        mineralToggle.setOnClickListener(v->{
+            mineralFilterEnabled=!mineralFilterEnabled;
+            mineralToggle.setText(mineralFilterEnabled?"MİNERAL FİLTRESİ: AÇIK":"MİNERAL FİLTRESİ: KAPALI");
+            if(ultrasound!=null)ultrasound.setMineralFilterEnabled(mineralFilterEnabled);
+        });
+        magneticFilters.addView(mineralToggle,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,36)));
+        magneticFilters.setVisibility(android.view.View.GONE);
+        root.addView(magneticFilters);
         ultrasound = new UltrasoundView(this); ultrasound.setPalette(Prefs.palette(this));ultrasound.setGain(liveGain);
         root.addView(ultrasound,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,0,1));
 
@@ -171,6 +205,7 @@ public final class LiveScanActivity extends Activity implements BluetoothClient.
 
     private void switchMode(boolean gpr){
         gprStyle=gpr; ultrasound.setGprStyle(gpr);
+        if(magneticFilters!=null)magneticFilters.setVisibility(gpr?android.view.View.VISIBLE:android.view.View.GONE);
         normalMode.setText(gpr?"NORMAL":"● NORMAL");
         gprMode.setText(gpr?"● GPR GÖRÜNÜM":"GPR GÖRÜNÜM");
     }
