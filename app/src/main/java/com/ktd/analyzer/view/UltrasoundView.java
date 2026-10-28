@@ -68,7 +68,7 @@ public final class UltrasoundView extends View {
         if(w<=0||h<=0||count==0)return;
         final int cols=144;
         final int rows=Math.max(1,Math.min(h,1024));
-        final float pixelsPerSample=12.0f; // Daha seri akış: her gerçek örnekte 12 ekran pikseli
+        final float pixelsPerSample=gprStyle ? 12.0f : 24.0f; // NORMAL: 2x görsel kayma; GPR görünüm: önceki hız
         final float scale=(float)h/rows;
         android.graphics.Bitmap bm=android.graphics.Bitmap.createBitmap(cols,rows,android.graphics.Bitmap.Config.RGB_565);
         // Match the visible step size to physical pixels, regardless of screen height.
