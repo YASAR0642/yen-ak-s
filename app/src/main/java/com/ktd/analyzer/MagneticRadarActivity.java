@@ -1,228 +1,126 @@
 package com.ktd.analyzer;
 
 import android.app.Activity;
-import android.graphics.Color;
+import android.content.Intent;
 import android.content.pm.ActivityInfo;
+import android.graphics.Color;
+import android.net.Uri;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.widget.*;
 import com.ktd.analyzer.bluetooth.BluetoothClient;
 import com.ktd.analyzer.data.ReferenceModel;
 import com.ktd.analyzer.data.SensorFrame;
-import com.ktd.analyzer.view.MagneticRadarView;
+import com.ktd.analyzer.gpr.GprProtocol;
+import com.ktd.analyzer.view.GprRadargramView;
+import com.ktd.analyzer.view.GprTracePanelsView;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
 import java.util.Locale;
 
-/** Landscape magnetic display styled like the app's live GPR screen. */
+/** Magnetic survey visualisation, using the SAME drawing components as Live GPR.
+ *  Generated sections are visualization only, never time-of-flight samples. */
 public final class MagneticRadarActivity extends Activity implements BluetoothClient.Listener {
+    private static final int SAVE=9914;
     private BluetoothClient bluetooth;
-    private final ReferenceModel reference = new ReferenceModel();
-    private MagneticRadarView radar;
-    private TextView status, boostLabel;
-    private boolean running = false, zeroed = false, mineral = false;
-    private float boost = 2f;
-    private int paletteIndex = 0;
-    private final TextView[] traceLabels = new TextView[4];
-    private final float[] traceGain = {1f, 1f, 1f, 1f};
-    private final float[] traceLevel = {0, 0, 0, 0};
+    private final ReferenceModel reference=new ReferenceModel();
+    private GprRadargramView radar;
+    private GprTracePanelsView panels;
+    private TextView status, gainLabel, filterLabel;
+    private Button startButton;
+    private boolean running=false,zeroed=false,mineral=false;
+    private float gain=1f, boost=2f;
+    private int palette=1,antenna=300,timeIndex=3;
+    private final double[] windows={30,60,100,150,200,300,500};
+    private final ArrayList<Float> captured=new ArrayList<>();
+    private long sequence=0;
+    private float baseline=0,shortSmooth=0,peakSmooth=0;
 
-    @Override public void onCreate(Bundle b) {
-        super.onCreate(b);
-        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
-        bluetooth = new BluetoothClient(this);
-        build();
+    @Override public void onCreate(Bundle b){super.onCreate(b);setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);bluetooth=new BluetoothClient(this);build();}
+    private int dp(int n){return Ui.dp(this,n);}
+    private Button button(String name){Button b=Ui.button(this,name,false);b.setTextSize(11);b.setAllCaps(false);return b;}
+    private TextView text(String s,int size){TextView t=Ui.text(this,s,size,Color.WHITE);t.setGravity(Gravity.CENTER);return t;}
+    private void add(LinearLayout p,Button b){p.addView(b,new LinearLayout.LayoutParams(-1,0,1));}
+
+    private void build(){
+        LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(Color.rgb(5,15,23));root.setPadding(dp(5),dp(3),dp(5),dp(3));
+        LinearLayout head=new LinearLayout(this);head.setGravity(Gravity.CENTER_VERTICAL);
+        Button back=button("‹ NORMAL");back.setOnClickListener(v->finish());head.addView(back,new LinearLayout.LayoutParams(dp(96),dp(40)));
+        TextView title=text("KTD 3D ANALYZER GPR MOD",17);head.addView(title,new LinearLayout.LayoutParams(0,dp(42),1));
+        status=text("○ BLUETOOTH",12);head.addView(status,new LinearLayout.LayoutParams(dp(161),dp(38)));
+        root.addView(head,new LinearLayout.LayoutParams(-1,dp(44)));
+
+        LinearLayout body=new LinearLayout(this);body.setOrientation(LinearLayout.HORIZONTAL);
+        radar=new GprRadargramView(this);radar.setGain(gain);radar.setPalette(palette);
+        // NO fabricated nsPerSample or GPR source META. Scale remains MT* (display assumption).
+        radar.setEstimatedTime(true);radar.setTimeWindowNs(windows[timeIndex]);
+        body.addView(radar,new LinearLayout.LayoutParams(0,-1,63));
+
+        LinearLayout center=new LinearLayout(this);center.setOrientation(LinearLayout.VERTICAL);center.setBackgroundColor(Color.rgb(6,16,23));
+        LinearLayout gainRow=new LinearLayout(this);gainRow.setGravity(Gravity.CENTER_VERTICAL);
+        gainLabel=text("KAZANÇ 1.0×",11);gainRow.addView(gainLabel,new LinearLayout.LayoutParams(0,dp(30),1));
+        SeekBar gainBar=new SeekBar(this);gainBar.setMax(100);gainBar.setProgress(10);
+        gainBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
+            public void onProgressChanged(SeekBar s,int p,boolean user){gain=p/10f;gainLabel.setText(String.format(Locale.US,"KAZANÇ %.1f×",gain));radar.setGain(gain);panels.invalidate();}
+            public void onStartTrackingTouch(SeekBar s){}public void onStopTrackingTouch(SeekBar s){}
+        });gainRow.addView(gainBar,new LinearLayout.LayoutParams(0,dp(36),1));center.addView(gainRow,new LinearLayout.LayoutParams(-1,dp(39)));
+        panels=new GprTracePanelsView(this,radar);center.addView(panels,new LinearLayout.LayoutParams(-1,0,1));
+        body.addView(center,new LinearLayout.LayoutParams(0,-1,26));
+
+        LinearLayout controls=new LinearLayout(this);controls.setOrientation(LinearLayout.VERTICAL);
+        startButton=button("BAŞLAT");startButton.setOnClickListener(v->{if(!BluetoothClient.isConnected()){Toast.makeText(this,"Bluetooth bağlantısı gerekli",Toast.LENGTH_SHORT).show();return;}bluetooth.send("LIVE_START\n");running=true;startButton.setText("ÇALIŞIYOR");});add(controls,startButton);
+        Button stop=button("DURDUR");stop.setOnClickListener(v->{bluetooth.send("LIVE_STOP\n");running=false;startButton.setText("BAŞLAT");});add(controls,stop);
+        Button save=button("KAYDET");save.setOnClickListener(v->save());add(controls,save);
+        Button time=button("ZAMAN 150 ns*");time.setOnClickListener(v->{timeIndex=(timeIndex+1)%windows.length;radar.setTimeWindowNs(windows[timeIndex]);time.setText(String.format(Locale.US,"ZAMAN %.0f ns*",windows[timeIndex]));panels.invalidate();});add(controls,time);
+        Button color=button("RENK");color.setOnClickListener(v->{palette=(palette+1)%3;radar.setPalette(palette);panels.invalidate();});add(controls,color);
+        Button ant=button("ANTEN 300");ant.setOnClickListener(v->{int[] arr={100,200,300,400,500,800};int i=0;while(i<arr.length&&arr[i]!=antenna)i++;antenna=arr[(i+1)%arr.length];radar.setAntennaMhz(antenna);ant.setText("ANTEN "+antenna);});add(controls,ant);
+        Button filter=button("MİNERAL KAPALI");filter.setOnClickListener(v->{mineral=!mineral;filter.setText(mineral?"MİNERAL AÇIK":"MİNERAL KAPALI");});add(controls,filter);
+        Button boostButton=button("ANOMALİ 2.0×");boostButton.setOnClickListener(v->{boost=boost>=5f?1f:boost+.5f;boostButton.setText(String.format(Locale.US,"ANOMALİ %.1f×",boost));});add(controls,boostButton);
+        Button reset=button("SIFIRLA");reset.setOnClickListener(v->{reference.clear();zeroed=false;baseline=0;shortSmooth=0;peakSmooth=0;sequence=0;radar.clear();panels.invalidate();synchronized(captured){captured.clear();}});add(controls,reset);
+        body.addView(controls,new LinearLayout.LayoutParams(0,-1,11));root.addView(body,new LinearLayout.LayoutParams(-1,0,1));setContentView(root);Ui.applySafeInsets(this,root);updateStatus();
     }
 
-    private int dp(int a) { return Ui.dp(this, a); }
-    private Button button(String t) { Button b = Ui.button(this, t, false); b.setTextSize(11); return b; }
-    private TextView txt(String s, int size) { TextView t = Ui.text(this, s, size, Color.WHITE); t.setGravity(Gravity.CENTER); return t; }
+    private void updateStatus(){if(status==null)return;boolean ok=BluetoothClient.isConnected();status.setText(ok?"● BLUETOOTH BAĞLI":"○ BLUETOOTH YOK");status.setBackgroundColor(ok?Color.rgb(45,180,95):Color.rgb(104,50,54));}
+    @Override public void onState(String s){runOnUiThread(this::updateStatus);}
+    @Override protected void onStart(){super.onStart();bluetooth.activate();if(BluetoothClient.isConnected()){bluetooth.send("RATE=20\n");bluetooth.send("LIVE_START\n");running=true;}updateStatus();}
+    @Override protected void onStop(){if(BluetoothClient.isConnected())bluetooth.send("LIVE_STOP\n");running=false;bluetooth.release();super.onStop();}
 
-    private void build() {
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(Color.rgb(5, 15, 23));
-        root.setPadding(dp(5), dp(3), dp(5), dp(3));
-
-        LinearLayout head = new LinearLayout(this);
-        head.setGravity(Gravity.CENTER_VERTICAL);
-        Button back = button("‹ NORMAL");
-        back.setOnClickListener(v -> finish());
-        head.addView(back, new LinearLayout.LayoutParams(dp(105), dp(38)));
-
-        TextView title = txt("KTD 3D ANALYZER GPR MOD", 18);
-        head.addView(title, new LinearLayout.LayoutParams(0, dp(40), 1));
-
-        status = txt("○ BLUETOOTH", 12);
-        status.setPadding(dp(10), 0, dp(10), 0);
-        status.setBackgroundColor(Color.rgb(36, 48, 60));
-        head.addView(status, new LinearLayout.LayoutParams(dp(170), dp(38)));
-        root.addView(head, new LinearLayout.LayoutParams(-1, dp(43)));
-
-        LinearLayout body = new LinearLayout(this);
-        body.setOrientation(LinearLayout.HORIZONTAL);
-
-        radar = new MagneticRadarView(this);
-        radar.setBoost(boost);
-        body.addView(radar, new LinearLayout.LayoutParams(0, -1, 67));
-
-        LinearLayout midWrap = new LinearLayout(this);
-        midWrap.setOrientation(LinearLayout.HORIZONTAL);
-        midWrap.setBackgroundColor(Color.rgb(8, 23, 32));
-
-        LinearLayout meterCol = new LinearLayout(this);
-        meterCol.setOrientation(LinearLayout.VERTICAL);
-        meterCol.setGravity(Gravity.CENTER_HORIZONTAL);
-        TextView meterTitle = txt("MT", 11);
-        meterTitle.setTextColor(Color.rgb(142, 205, 250));
-        meterCol.addView(meterTitle, new LinearLayout.LayoutParams(-1, dp(28)));
-        for (int i = 0; i <= 4; i++) {
-            TextView mt = txt(String.format(Locale.US, "%d", i), 11);
-            mt.setTextColor(Color.rgb(210, 230, 238));
-            mt.setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL);
-            meterCol.addView(mt, new LinearLayout.LayoutParams(-1, 0, 1));
-        }
-        midWrap.addView(meterCol, new LinearLayout.LayoutParams(dp(28), -1));
-
-        LinearLayout middle = new LinearLayout(this);
-        middle.setOrientation(LinearLayout.VERTICAL);
-        boostLabel = txt("KAZANÇ 2.0×", 11);
-        middle.addView(boostLabel, new LinearLayout.LayoutParams(-1, dp(28)));
-        SeekBar boostBar = new SeekBar(this);
-        boostBar.setMax(100);
-        boostBar.setProgress(20);
-        boostBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            public void onProgressChanged(SeekBar s, int p, boolean user) {
-                boost = Math.max(0f, p / 10f);
-                boostLabel.setText(String.format(Locale.US, "KAZANÇ %.1f×", boost));
-                radar.setBoost(boost);
+    @Override public void onFrame(SensorFrame f){if(!running||f==null)return;float v=f.signal();if(!Float.isFinite(v)||v<0||v>1023)return;
+        runOnUiThread(()->{if(!running)return;float z=ReferenceModel.normalize(v);if(!zeroed){reference.zero(z);zeroed=true;return;}
+            float delta=reference.visualDelta(z);synchronized(captured){captured.add(delta);}
+            // Multi-scale magnetic response: one measured input, no invented reflectors.
+            baseline=baseline*.985f+delta*.015f;
+            shortSmooth=shortSmooth*.74f+delta*.26f;
+            peakSmooth=peakSmooth*.94f+delta*.06f;
+            float driftRemoved=mineral?delta-baseline:delta;
+            float slow=mineral?peakSmooth-baseline:peakSmooth;
+            float strengthened=driftRemoved+(boost-1f)*Math.signum(slow)*Math.max(0f,Math.abs(slow)-1f);
+            short[] section=new short[256];
+            for(int i=0;i<section.length;i++){
+                double y=i/(double)(section.length-1);
+                // A visualization kernel, NOT a measured echo, depth or travel-time series.
+                double spatial=Math.exp(-Math.pow((y-.5)/.30,2));
+                double band=Math.cos(2*Math.PI*y*3)*.18+1;
+                double amplitude=strengthened*spatial*band*130;
+                section[i]=(short)Math.max(Short.MIN_VALUE,Math.min(Short.MAX_VALUE,Math.round(amplitude)));
             }
-            public void onStartTrackingTouch(SeekBar s) {}
-            public void onStopTrackingTouch(SeekBar s) {}
+            radar.add(new GprProtocol.Trace(sequence++,section));panels.invalidate();
         });
-        middle.addView(boostBar, new LinearLayout.LayoutParams(-1, dp(30)));
-
-        for (int i = 0; i < 4; i++) {
-            final int id = i;
-            LinearLayout cell = new LinearLayout(this);
-            cell.setOrientation(LinearLayout.VERTICAL);
-            traceLabels[i] = txt("G" + (i + 1) + " 1.0× • 0", 11);
-            cell.addView(traceLabels[i], new LinearLayout.LayoutParams(-1, dp(22)));
-            SeekBar bar = new SeekBar(this);
-            bar.setMax(100);
-            bar.setProgress(10);
-            bar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-                public void onProgressChanged(SeekBar s, int p, boolean user) {
-                    traceGain[id] = p / 10f;
-                    refreshTrace(id);
-                }
-                public void onStartTrackingTouch(SeekBar s) {}
-                public void onStopTrackingTouch(SeekBar s) {}
-            });
-            cell.addView(bar, new LinearLayout.LayoutParams(-1, dp(28)));
-            middle.addView(cell, new LinearLayout.LayoutParams(-1, 0, 1));
-        }
-        midWrap.addView(middle, new LinearLayout.LayoutParams(0, -1, 1));
-        body.addView(midWrap, new LinearLayout.LayoutParams(0, -1, 22));
-
-        LinearLayout controls = new LinearLayout(this);
-        controls.setOrientation(LinearLayout.VERTICAL);
-        Button start = button("BAŞLAT");
-        start.setOnClickListener(v -> {
-            if (!BluetoothClient.isConnected()) return;
-            bluetooth.send("LIVE_START\n");
-            running = true;
-            start.setText("DEVAM");
-        });
-        controls.addView(start, new LinearLayout.LayoutParams(-1, 0, 1));
-
-        Button stop = button("DURDUR");
-        stop.setOnClickListener(v -> {
-            bluetooth.send("LIVE_STOP\n");
-            running = false;
-        });
-        controls.addView(stop, new LinearLayout.LayoutParams(-1, 0, 1));
-
-        Button reset = button("SIFIRLA");
-        reset.setOnClickListener(v -> {
-            zeroed = false;
-            reference.clear();
-            radar.clear();
-        });
-        controls.addView(reset, new LinearLayout.LayoutParams(-1, 0, 1));
-
-        Button mineralBtn = button("MİNERAL: KAPALI");
-        mineralBtn.setOnClickListener(v -> {
-            mineral = !mineral;
-            radar.setMineral(mineral);
-            mineralBtn.setText(mineral ? "MİNERAL: AÇIK" : "MİNERAL: KAPALI");
-        });
-        controls.addView(mineralBtn, new LinearLayout.LayoutParams(-1, 0, 1));
-
-        Button colorBtn = button("RENK");
-        colorBtn.setOnClickListener(v -> {
-            paletteIndex = (paletteIndex + 1) % 4;
-            radar.setPalette(paletteIndex);
-        });
-        controls.addView(colorBtn, new LinearLayout.LayoutParams(-1, 0, 1));
-
-        body.addView(controls, new LinearLayout.LayoutParams(0, -1, 11));
-        root.addView(body, new LinearLayout.LayoutParams(-1, 0, 1));
-        setContentView(root);
-        Ui.applySafeInsets(this, root);
-        updateStatusUi();
     }
 
-    private void refreshTrace(int i) {
-        if (traceLabels[i] != null) {
-            traceLabels[i].setText(String.format(Locale.US, "G%d %.1f× • %.1f", i + 1, traceGain[i], traceLevel[i] * traceGain[i]));
-        }
+    private void save(){synchronized(captured){if(captured.isEmpty()){Toast.makeText(this,"Kaydedilecek manyetik ölçüm yok",Toast.LENGTH_SHORT).show();return;}}
+        Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);i.addCategory(Intent.CATEGORY_OPENABLE);i.setType("text/csv");i.putExtra(Intent.EXTRA_TITLE,"KTD_MANYETIK_"+new SimpleDateFormat("yyyyMMdd_HHmmss",Locale.US).format(new Date())+".csv");startActivityForResult(i,SAVE);
     }
-
-    @Override protected void onStart() {
-        super.onStart();
-        bluetooth.activate();
-        if (BluetoothClient.isConnected()) {
-            bluetooth.send("RATE=20\n");
-            bluetooth.send("LIVE_START\n");
-            running = true;
-        }
-        updateStatusUi();
-    }
-
-    @Override protected void onStop() {
-        if (BluetoothClient.isConnected()) bluetooth.send("LIVE_STOP\n");
-        running = false;
-        bluetooth.release();
-        super.onStop();
-    }
-
-    private void updateStatusUi() {
-        if (status == null) return;
-        boolean connected = BluetoothClient.isConnected();
-        status.setText(connected ? "● BLUETOOTH BAĞLI" : "○ BLUETOOTH YOK");
-        status.setTextColor(Color.WHITE);
-        status.setBackgroundColor(connected ? Color.rgb(48, 196, 104) : Color.rgb(120, 48, 48));
-    }
-
-    @Override public void onState(String state) { runOnUiThread(this::updateStatusUi); }
-
-    @Override public void onFrame(SensorFrame f) {
-        if (!running || f == null) return;
-        float v = f.signal();
-        if (!Float.isFinite(v) || v < 0 || v > 1023) return;
-        runOnUiThread(() -> {
-            if (!running) return;
-            float z = ReferenceModel.normalize(v);
-            if (!zeroed) {
-                reference.zero(z);
-                zeroed = true;
-                return;
-            }
-            float delta = reference.visualDelta(z);
-            radar.append(delta);
-            for (int i = 0; i < 4; i++) {
-                traceLevel[i] = traceLevel[i] * (.45f + i * .13f) + delta * (.55f - i * .13f);
-                refreshTrace(i);
-            }
-        });
+    @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(request!=SAVE||result!=RESULT_OK||data==null||data.getData()==null)return;
+        Uri uri=data.getData();ArrayList<Float> copy; synchronized(captured){copy=new ArrayList<>(captured);}
+        new Thread(()->{try(OutputStream out=getContentResolver().openOutputStream(uri)){
+            if(out==null)throw new java.io.IOException("Kayıt açılamadı");
+            out.write("index,magnetic_delta,source\n".getBytes(StandardCharsets.UTF_8));
+            for(int k=0;k<copy.size();k++){out.write(String.format(Locale.US,"%d,%.6f,GRADIOMETER\n",k,copy.get(k)).getBytes(StandardCharsets.UTF_8));}
+            runOnUiThread(()->Toast.makeText(this,"Manyetik CSV kaydedildi",Toast.LENGTH_SHORT).show());
+        }catch(Exception ex){runOnUiThread(()->Toast.makeText(this,"Kayıt hatası: "+ex.getMessage(),Toast.LENGTH_LONG).show());}},"magnetic-csv-export").start();
     }
 }
