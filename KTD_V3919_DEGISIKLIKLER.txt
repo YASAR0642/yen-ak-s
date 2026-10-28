@@ -1,0 +1,9 @@
+KTD 3D ANALYZER v3.9.19
+- SGY replay frame interval 32 ms -> 29 ms (yaklasik %10 daha hizli).
+- G1-G4 gain = radargram 0-25%, 25-50%, 50-75%, 75-100% derinlik dilimleri.
+- Her bolge 0.0x - 10.0x; gorsel sinyal siddeti etkilenir, ham veri degismez.
+- G1-G4 yan grafikler son A-scan in dort ayri derinlik diliminden cizilir.
+- Sag derinlik ekseni m olarak cizilir (0.299792458 * t_ns / (2 * sqrt(epsilon))).
+- Anten secimi gosterim secimidir. Frekans tek basina dielektrik hiz ve fiziksel derinlik hesabini belirlemez.
+- SGY dosyasindaki ns degeri belirsizse m isaretlerinin dogrulugu belirsizdir.
+- Tam Android APK derlemesi yapilmadi.

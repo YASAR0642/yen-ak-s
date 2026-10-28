@@ -13,7 +13,7 @@ import java.util.List;
 public final class GprTracePanelsView extends View {
     private final GprRadargramView radar;
     private final Paint pen=new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final float[] gains={1f,1f,1f,1f};
+
     private int activePanel=-1;
     private float startX, startGain;
     @Override public boolean onTouchEvent(MotionEvent e){
@@ -21,11 +21,11 @@ public final class GprTracePanelsView extends View {
         int panel=Math.max(0,Math.min(3,(int)(4*e.getY()/getHeight())));
         switch(e.getActionMasked()){
             case MotionEvent.ACTION_DOWN:
-                activePanel=panel;startX=e.getX();startGain=gains[panel];return true;
+                activePanel=panel;startX=e.getX();startGain=radar.getDepthGain(panel);return true;
             case MotionEvent.ACTION_MOVE:
                 if(activePanel>=0){
                     float delta=(e.getX()-startX)/Math.max(1f,getWidth());
-                    gains[activePanel]=Math.max(0f,Math.min(10f,startGain+delta*10f));
+                    radar.setDepthGain(activePanel,Math.max(0f,Math.min(10f,startGain+delta*10f)));
                     invalidate();return true;
                 }
                 return false;
@@ -52,10 +52,10 @@ public final class GprTracePanelsView extends View {
             pen.setColor(Color.rgb(138,50,49));canvas.drawLine(centerX,y0+6*dp,centerX,y1-8*dp,pen);
             pen.setStyle(Paint.Style.FILL);pen.setTypeface(android.graphics.Typeface.MONOSPACE);
             pen.setTextSize(dp*10f);pen.setColor(Color.rgb(185,215,230));
-            canvas.drawText("G"+(box+1)+"  "+String.format(java.util.Locale.US,"%.1f×",gains[box]),4*dp,y0+12*dp,pen);
+            canvas.drawText("G"+(box+1)+"  "+String.format(java.util.Locale.US,"%.1f×",radar.getDepthGain(box)),4*dp,y0+12*dp,pen);
             if(tr.isEmpty())continue;
-            // Four independent positions along the available trace history.
-            int at=Math.min(tr.size()-1,Math.max(0,(int)((long)(box+1)*tr.size()/5)));
+            // Each panel is a successive 25% depth interval, not a different trace location.
+            int at=tr.size()-1;
             short[] samples=tr.get(at).samples;
             int count=samples.length;
             if(radar.hasTimeAxis()&&Double.isFinite(radar.getTimeWindowNs()))
@@ -65,14 +65,16 @@ public final class GprTracePanelsView extends View {
             for(GprProtocol.Trace t:tr){
                 for(int i=0;i<Math.min(count,t.samples.length);i++)max=Math.max(max,Math.abs((int)t.samples[i]));
             }
+            int start=box*count/4;
+            int end=Math.max(start+1,(box+1)*count/4);
             float lim=Math.max(2,(y1-y0)-24*dp);
             float halfW=(w-16*dp)*.43f;
             float oldX=centerX,oldY=y0+18*dp;
             pen.setStyle(Paint.Style.STROKE);pen.setColor(Color.WHITE);pen.setStrokeWidth(dp*.9f);
-            for(int i=0;i<count;i++){
-                float xx=centerX+Math.max(-halfW,Math.min(halfW,samples[i]*halfW*gains[box]/max));
-                float yy=y0+17*dp+lim*i/Math.max(1,count-1);
-                if(i>0)canvas.drawLine(oldX,oldY,xx,yy,pen);
+            for(int i=start;i<end;i++){
+                float xx=centerX+Math.max(-halfW,Math.min(halfW,samples[i]*halfW*radar.getDepthGain(box)/max));
+                float yy=y0+17*dp+lim*(i-start)/Math.max(1,end-start-1);
+                if(i>start)canvas.drawLine(oldX,oldY,xx,yy,pen);
                 oldX=xx;oldY=yy;
             }
         }

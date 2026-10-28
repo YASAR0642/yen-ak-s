@@ -62,7 +62,7 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
     private double loadedDxMeters=Double.NaN;
     private int replayPreviewColumns=180;
     private int selectedPalette=1;
-    private static final int REPLAY_FRAME_MS=32; // 25% faster playback: 40/1.25
+    private static final int REPLAY_FRAME_MS=29; // 25% faster playback: 40/1.25
     // Bluetooth input is drained in short batches; display memory stays bounded.
     private static final int MAX_PENDING_MESSAGES=4096;
     private long droppedGprMessages=0;
@@ -350,7 +350,7 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
         String[] options={"100 MHz","200 MHz","300 MHz","400 MHz","500 MHz","800 MHz"};
         final int[] values={100,200,300,400,500,800};
         new AlertDialog.Builder(this).setTitle("ANTEN SEÇ").setItems(options,(d,n)->{
-            antennaMhz=values[n];if(antennaButton!=null)antennaButton.setText("ANTEN\n"+antennaMhz+" MHz");
+            antennaMhz=values[n];radar.setAntennaMhz(antennaMhz);if(antennaButton!=null)antennaButton.setText("ANTEN\n"+antennaMhz+" MHz");
             // It is a display preset; RF hardware cannot be retuned without a supported command.
         }).show();
     }

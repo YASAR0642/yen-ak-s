@@ -26,6 +26,9 @@ public final class GprRadargramView extends View {
     private int nSamples=0, maxAbsolute=100, filterMode=0, palette=0;
     private double dtNs=Double.NaN, dxMeters=Double.NaN, epsilonR=9, timeWindowNs=Double.NaN;
     private float gain=1f;
+    private final float[] depthGains={1f,1f,1f,1f};
+    private int antennaMhz=300;
+    private boolean estimatedTime=false;
     private boolean demo=false, hyperbolicContrast=false, autoContrast=true;
     private long lastSequence=-1;
 
@@ -39,6 +42,10 @@ public final class GprRadargramView extends View {
     public void resetSession(){clear();dtNs=Double.NaN;dxMeters=Double.NaN;demo=false;maxAbsolute=100;invalidate();}
     public void setGain(float value){gain=Math.max(0f,Math.min(10f,value));invalidate();}
     public float getGain(){return gain;}
+    public void setDepthGain(int section,float value){if(section>=0&&section<4){depthGains[section]=Math.max(0f,Math.min(10f,value));invalidate();}}
+    public float getDepthGain(int section){return depthGains[Math.max(0,Math.min(3,section))];}
+    public void setAntennaMhz(int mhz){antennaMhz=mhz;invalidate();}
+    public void setEstimatedTime(boolean value){estimatedTime=value;invalidate();}
     public void setEpsilon(double value){epsilonR=Math.max(1,Math.min(50,value));invalidate();}
     public double getEpsilon(){return epsilonR;}
     public void setFilterMode(int f){filterMode=Math.max(0,Math.min(3,f));invalidate();}
@@ -111,7 +118,7 @@ public final class GprRadargramView extends View {
         canvas.drawColor(Color.rgb(2,7,10));
         int w=getWidth(),h=getHeight();
         float dp=getResources().getDisplayMetrics().density;
-        int left=(int)(52*dp),right=(int)(48*dp),top=(int)(28*dp),bottom=(int)(23*dp);
+        int left=(int)(52*dp),right=(int)(56*dp),top=(int)(28*dp),bottom=(int)(23*dp);
         int ww=Math.max(1,w-left-right),hh=Math.max(1,h-top-bottom);
         p.setStyle(Paint.Style.FILL);p.setColor(Color.BLACK);canvas.drawRect(left,top,left+ww,top+hh,p);
         List<GprProtocol.Trace> items=snapshot();
@@ -139,7 +146,10 @@ public final class GprRadargramView extends View {
                     double a0=sampled[Math.max(0,x-1)][y],a1=sampled[Math.min(visibleN-1,x+1)][y];
                     a+=(a-(a0+a1)*.5)*.48;
                 }
-                pixels[y*visibleN+x]=(gain<=0.0001f ? Color.rgb(31,39,45) : shade(a/scale));
+                int section=Math.min(3,(int)((long)y*4/rows));
+                float localGain=depthGains[section];
+                double response=a/scale*localGain;
+                pixels[y*visibleN+x]=(gain<=0.0001f || localGain<=0.0001f ? Color.rgb(128,128,128) : shade(response));
             }
             Bitmap bmp=Bitmap.createBitmap(pixels,visibleN,rows,Bitmap.Config.ARGB_8888);
             p.setFilterBitmap(true);p.setStyle(Paint.Style.FILL);
@@ -162,7 +172,7 @@ public final class GprRadargramView extends View {
                 double dep=GprProtocol.depthMeters(index,dtNs,epsilonR,0);
                 if(Double.isFinite(dep)){
                     label.setTextAlign(Paint.Align.LEFT);
-                    canvas.drawText(String.format(Locale.US,"%.2f",dep/USER_GPR_DEPTH_DISPLAY_SCALE),left+ww+5*dp,y+4*dp,label);
+                    canvas.drawText(String.format(Locale.US,"%.2f",dep),left+ww+5*dp,y+4*dp,label);
                 }
             }
         }
@@ -171,7 +181,7 @@ public final class GprRadargramView extends View {
         canvas.drawText(hasTimeAxis()?"ns":"ÖRNEK",left-5*dp,top-9*dp,label);
         label.setTextAlign(Paint.Align.LEFT);
         label.setColor(Color.rgb(115,201,240));
-        canvas.drawText(hasTimeAxis()?"DERİNLİK":"DERİNLİK --",left+ww+5*dp,top-9*dp,label);
+        canvas.drawText(hasTimeAxis()?(estimatedTime?"m*":"m"):"m --",left+ww+5*dp,top-9*dp,label);
         // Single fixed trace label, no repeated "İz" labels over ns ticks.
         label.setTextAlign(Paint.Align.LEFT);
         label.setColor(Color.rgb(210,224,232));
