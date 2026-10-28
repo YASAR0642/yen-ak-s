@@ -135,7 +135,7 @@ public final class LiveScanActivity extends Activity implements BluetoothClient.
         normalMode=Ui.button(this,"NORMAL",true);
         gprMode=Ui.button(this,"GPR GÖRÜNÜM",false);
         normalMode.setOnClickListener(v->switchMode(false));
-        gprMode.setOnClickListener(v->switchMode(true));
+        gprMode.setOnClickListener(v->startActivity(new android.content.Intent(this,MagneticRadarActivity.class)));
         modes.addView(normalMode,new LinearLayout.LayoutParams(0,Ui.dp(this,42),1));
         modes.addView(gprMode,new LinearLayout.LayoutParams(0,Ui.dp(this,42),1));
         root.addView(modes);

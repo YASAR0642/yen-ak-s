@@ -78,6 +78,7 @@
         <activity android:name=".SettingsActivity" android:screenOrientation="unspecified"/>
         <activity android:name=".RecordsActivity" android:screenOrientation="unspecified"/>
         <activity android:name=".LiveGprActivity" android:screenOrientation="sensorLandscape"/>
+        <activity android:name=".MagneticRadarActivity" android:screenOrientation="sensorLandscape"/>
         <activity android:name=".LiveScanActivity" android:screenOrientation="unspecified"/>
         <activity android:name=".AnalysisActivity" android:screenOrientation="unspecified"/>
         <activity android:name=".ScanActivity" android:screenOrientation="unspecified"/>
