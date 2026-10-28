@@ -193,7 +193,7 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
         root.addView(body,new LinearLayout.LayoutParams(-1,0,1));
         footer=text("COM • 0 İZ",10);footer.setGravity(Gravity.CENTER_VERTICAL);
         footer.setTextColor(Color.rgb(132,191,215));
-        root.addView(footer,new LinearLayout.LayoutParams(-1,dp(19)));
+        // Bottom status details deliberately hidden; keep footer for internal updates.
         setContentView(root);Ui.applySafeInsets(this,root);
     }
     private void addRow(LinearLayout parent,Button one,Button two){

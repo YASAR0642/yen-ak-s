@@ -118,7 +118,7 @@ public final class GprRadargramView extends View {
         canvas.drawColor(Color.rgb(2,7,10));
         int w=getWidth(),h=getHeight();
         float dp=getResources().getDisplayMetrics().density;
-        int left=(int)(52*dp),right=(int)(56*dp),top=(int)(28*dp),bottom=(int)(23*dp);
+        int left=(int)(52*dp),right=(int)(68*dp),top=(int)(28*dp),bottom=(int)(8*dp);
         int ww=Math.max(1,w-left-right),hh=Math.max(1,h-top-bottom);
         p.setStyle(Paint.Style.FILL);p.setColor(Color.BLACK);canvas.drawRect(left,top,left+ww,top+hh,p);
         List<GprProtocol.Trace> items=snapshot();
@@ -160,40 +160,40 @@ public final class GprRadargramView extends View {
         }
         p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(dp*.65f);p.setColor(Color.rgb(85,111,125));
         canvas.drawRect(left,top,left+ww,top+hh,p);
-        // Reserve edge space for axes; use fewer ticks on small phone viewports.
-        for(int i=0;i<=6;i++){
-            float y=top+hh*i/6f;
-            p.setColor(Color.argb(70,190,215,235));canvas.drawLine(left,y,left+ww,y,p);
-            int index=(int)Math.round((visibleSamples-1)*i/6.0);
-            String t=hasTimeAxis()?String.format(Locale.US,"%.1f",index*dtNs):Integer.toString(index);
+        // PC-style right-hand MT* scale. An unknown SGY sample interval is NOT
+        // silently treated as measured time; its display fallback is explicitly starred.
+        boolean measuredNs=hasTimeAxis();
+        double visibleTimeNs=measuredNs ? (visibleSamples-1)*dtNs : Double.NaN;
+        if(!Double.isFinite(visibleTimeNs) || visibleTimeNs<=0)
+            visibleTimeNs=(Double.isFinite(timeWindowNs)&&timeWindowNs>0)?timeWindowNs:150.0;
+        // PC screenshot scale: 150 ns -> approximately 10 m (epsilon_r ~5.05).
+        // This fallback is a display reference only, never a claim of measured depth.
+        double displayEpsilon=measuredNs?epsilonR:5.05;
+        double maxDepth=0.299792458*visibleTimeNs/(2.0*Math.sqrt(displayEpsilon));
+        float axisX=left+ww;
+        p.setStyle(Paint.Style.FILL);p.setColor(Color.BLACK);
+        canvas.drawRect(axisX+1,top-4*dp,w,top+hh+2*dp,p);
+        label.setTextAlign(Paint.Align.CENTER);label.setColor(Color.rgb(118,234,229));
+        canvas.drawText(measuredNs ? "MT" : "MT*",axisX+right*.5f,top-9*dp,label);
+        final int steps=12;
+        for(int i=0;i<=steps;i++){
+            float y=top+hh*i/(float)steps;
+            p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(dp*.55f);
+            p.setColor(Color.argb(45,190,215,235));
+            canvas.drawLine(left,y,axisX,y,p);
+            p.setColor(Color.rgb(61,83,96));canvas.drawLine(axisX+1,y,w,y,p);
+            label.setTextAlign(Paint.Align.RIGHT);label.setColor(Color.rgb(205,224,238));
+            canvas.drawText(String.format(Locale.US,"%.2f",maxDepth*i/steps),w-3*dp,y+(i==0?10*dp:i==steps?-2*dp:4*dp),label);
+            // Keep the sample index left-side as a navigation aid, separate from metres.
+            int index=(int)Math.round((visibleSamples-1)*i/(double)steps);
             label.setTextAlign(Paint.Align.RIGHT);label.setColor(Color.rgb(194,219,235));
-            canvas.drawText(t,left-4*dp,y+4*dp,label);
-            if(hasTimeAxis()){
-                double dep=GprProtocol.depthMeters(index,dtNs,epsilonR,0);
-                if(Double.isFinite(dep)){
-                    label.setTextAlign(Paint.Align.LEFT);
-                    canvas.drawText(String.format(Locale.US,"%.2f",dep),left+ww+5*dp,y+4*dp,label);
-                }
-            }
+            canvas.drawText(Integer.toString(index),left-5*dp,y+(i==0?10*dp:i==steps?-2*dp:4*dp),label);
         }
-        label.setTextAlign(Paint.Align.RIGHT);
-        label.setColor(Color.rgb(115,201,240));
-        canvas.drawText(hasTimeAxis()?"ns":"ÖRNEK",left-5*dp,top-9*dp,label);
-        label.setTextAlign(Paint.Align.LEFT);
-        label.setColor(Color.rgb(115,201,240));
-        canvas.drawText(hasTimeAxis()?(estimatedTime?"m*":"m"):"m --",left+ww+5*dp,top-9*dp,label);
-        // Single fixed trace label, no repeated "İz" labels over ns ticks.
-        label.setTextAlign(Paint.Align.LEFT);
-        label.setColor(Color.rgb(210,224,232));
-        // Horizontal trace index is source sequence; do not imply physical metres without dx.
-        if(visibleN>0)canvas.drawText("İZ "+items.get(0).sequence+"–"+items.get(visibleN-1).sequence,left+5*dp,top-7*dp,label);
         for(int x=1;x<8;x++){
             float cx=left+x*ww/8f;
             p.setColor(Color.argb(65,145,168,183));
             canvas.drawLine(cx,top,cx,top+hh,p);
         }
-        label.setTextAlign(Paint.Align.LEFT);label.setColor(Color.rgb(150,187,202));
-        String dx=(Double.isFinite(dxMeters)&&dxMeters>0)?String.format(Locale.US,"MESAFE %.2f m",Math.max(0,visibleN-1)*dxMeters):"MESAFE: BİLİNMİYOR  •  "+visibleN+" İZ";
-        canvas.drawText(dx,left+5*dp,h-3*dp,label);
+
     }
 }

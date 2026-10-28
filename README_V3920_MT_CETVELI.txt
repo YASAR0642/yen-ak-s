@@ -1,0 +1,1 @@
+KTD 3D ANALYZER v3.9.20\nGPR radargraminin saginda PC benzeri MT/MT* cetveli. Alt durum satirlari ve radargram alt mesafe/iz yazisi gizlendi. SGY gercek ns bilgisi yoksa secilen pencere (varsayilan 150 ns) ve epsilon~5.05 ile yaklasik MT* gosterimi yapilir. MT* gercek saha derinligi olarak kabul edilmemelidir. EXE kaynak kodu birebir dogrulanamadi.\n
