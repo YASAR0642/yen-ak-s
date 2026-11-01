@@ -166,8 +166,8 @@ public final class AnalysisActivity extends Activity {
         boolean modelReady=hasModelDepth();
         if(levelSeek!=null)levelSeek.setEnabled(available);
         if(levelLabel==null)return;
-        if(showing4D && visualData!=null && visualData.rulerDerivedDepth){
-            levelLabel.setText("4D Z: 800/Z göreli indeks (metre değil)");return;
+        if(visualData!=null && visualData.rulerDerivedDepth){
+            levelLabel.setText("C=800/Z • indeks (metre değil)");return;
         }
         if(!available&&!modelReady){
             levelLabel.setText("Z: göreli hacim (derinlik yok)");return;
@@ -289,7 +289,7 @@ public final class AnalysisActivity extends Activity {
     private void showSurface(){
         if(surface!=null)surface.onPause();if(volume4d!=null)volume4d.onPause();
         showing4D=false;
-        visualData=ReferenceInverseDepth.createVisualDepth(data);
+        visualData=ReferenceInverseDepth.createRelativeIndexVolume(data);
         host.removeAllViews();surface=new ProSurfaceGLView(this);surface.setData(visualData);surface.setPalette(palette);surface.setSmoothing(Prefs.smoothing(this));surface.setWireframe(Prefs.grid(this));surface.setDisplayGain(anomalyGain);
         surface.setMode(ProSurfaceGLView.ADVANCED);surface.setDepthSliceMeters(depthSliceMeters);
         host.addView(surface,new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT,FrameLayout.LayoutParams.MATCH_PARENT));

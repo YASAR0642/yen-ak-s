@@ -102,26 +102,23 @@ public final class ReferenceInverseDepth {
         return out;
     }
 
-    /** 4D only: C=800/Z is a dimensionless signal index, mapped onto a 0..1
-     * relative visualization axis. This is NOT physical depth in metres.
-     * Original XYZC and measurement deltas are preserved. */
+    /**
+     * Voxler-like C axis: C = 800 / Z is used in its ORIGINAL numeric
+     * coordinate, without per-scan min/max normalization. Thus two scans
+     * with identical Z values produce identical C positions.
+     * C is a derived magnetic SIGNAL INDEX, NOT a measured depth in metres.
+     */
     public static ScanData createRelativeIndexVolume(ScanData original){
         if(original==null)return null;
         ScanData out=createVisualDepth(original);
-        float lo=Float.POSITIVE_INFINITY,hi=Float.NEGATIVE_INFINITY;
-        for(int r=0;r<out.rows;r++)for(int c=0;c<out.cols;c++)if(out.filled[r][c]){
-            float v=com.ktd.analyzer.data.InverseSignalIndex.fromRaw(out.raw[r][c]);
-            if(Float.isFinite(v)){lo=Math.min(lo,v);hi=Math.max(hi,v);}
-        }
-        float span=hi-lo;
         for(int r=0;r<out.rows;r++)for(int c=0;c<out.cols;c++){
-            float v=com.ktd.analyzer.data.InverseSignalIndex.fromRaw(out.raw[r][c]);
-            out.depth[r][c]=out.filled[r][c]&&Float.isFinite(v) ?
-                (span>0.00001f ? 0.12f+0.76f*(v-lo)/span : 0.50f) : Float.NaN;
+            float v=InverseSignalIndex.fromRaw(out.raw[r][c]);
+            out.depth[r][c]=out.filled[r][c] && Float.isFinite(v) ? v : Float.NaN;
         }
         out.cIsDerivedFromRaw=true;
         out.derivedCDivisor=800;
         out.rulerDerivedDepth=true;
         return out;
     }
+
 }

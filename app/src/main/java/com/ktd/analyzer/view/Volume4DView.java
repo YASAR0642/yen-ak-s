@@ -178,8 +178,9 @@ public final class Volume4DView extends GLSurfaceView {
             // 30 cm gridde yaklaşık 0.13..0.30 m sigma aralığı; küçük XY hedefi
             // derin bir kolona dönüşmez.
             final float stepM=Math.max(.05f,source.stepCm/100f);
-            final float sigmaMeters=Math.max(.10f,stepM*(.45f+.55f*spread01));
-            final float sigmaNorm=clamp(sigmaMeters/maxDepth,.025f,.28f);
+            // Volume thickness in C-index units: depends on index scale, not invented metres.
+            final float sigmaIndex=Math.max(.08f,maxDepth*(.065f+.11f*spread01));
+            final float sigmaNorm=clamp(sigmaIndex/maxDepth,.025f,.28f);
 
             float iso=signMax*levelFrac;
             ArrayList<Float> pos=new ArrayList<>(),norm=new ArrayList<>();
@@ -203,7 +204,7 @@ public final class Volume4DView extends GLSurfaceView {
                     // Gerçek bir C değeri/interpolasyonu yoksa sahte yüzey derinliği üretme.
                     if(!Float.isFinite(depthM)){
                         // Ham anomali verisiyle yalnız göreli hacim çizimi; metre üretmez.
-                        depthM=.50f; // Relative display centre, never physical 0.50m
+                        depthM=maxDepth*.5f; // No valid C: display centre in C-index coordinates
                     }
                     depthM=clamp(depthM,0f,maxDepth);
                     float centerNorm=clamp(depthM/maxDepth,0f,1f);
@@ -211,7 +212,7 @@ public final class Volume4DView extends GLSurfaceView {
                     float zNorm=clamp((-pz)/Math.max(.001f,ZMAX),0f,1f);
                     float dzNorm=(zNorm-centerNorm)/sigmaNorm;
                     float depthKernel=(float)Math.exp(-.5f*dzNorm*dzNorm);
-                    float focusSigma=Math.max(.22f,Math.min(Math.max(.38f,maxDepth*.18f),Math.max(.30f,sigmaMeters*1.8f)));
+                    float focusSigma=Math.max(.22f,Math.min(Math.max(.38f,maxDepth*.18f),Math.max(.30f,sigmaIndex*1.8f)));
                     float df=(depthM-focusDepth)/focusSigma;
                     float focusKernel=!realDepth&&!modelReady?1f:
                             depthFocusMeters<=0f?1f:(float)Math.exp(-.5f*df*df);
