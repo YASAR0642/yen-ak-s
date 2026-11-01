@@ -164,10 +164,10 @@ public final class AnalysisActivity extends Activity {
     private void updateDepthLabel(){
         boolean available=visualData!=null&&visualData.hasDepthData();
         boolean modelReady=hasModelDepth();
-        if(levelSeek!=null)levelSeek.setEnabled(available || modelReady);
+        if(levelSeek!=null)levelSeek.setEnabled(available);
         if(levelLabel==null)return;
         if(!available&&!modelReady){
-            levelLabel.setText("Ters ölçek • veri yok");return;
+            levelLabel.setText("Z: göreli hacim (derinlik yok)");return;
         }
         if(depthSliceMeters<=0f){levelLabel.setText(available?"≈ Derinlik: Tümü":"Model: Tümü");return;}
         levelLabel.setText(String.format(Locale.forLanguageTag("tr-TR"),
@@ -185,8 +185,8 @@ public final class AnalysisActivity extends Activity {
         float m=hasModelDepth()?(float)lastDepthResult.depthMeters:Float.NaN;
         float mx=modelMaxDepth();
         if(surface!=null)surface.setModelDepthMeters(m,mx);
-        if(volume4d!=null)volume4d.setModelDepthMeters(m,mx);
-        if(currentAxes!=null)currentAxes.setModelDepthMeters(m,mx);
+        if(volume4d!=null)volume4d.setModelDepthMeters(Float.NaN,Float.NaN);
+        if(currentAxes!=null)currentAxes.setModelDepthMeters(Float.NaN,Float.NaN);
         updateDepthLabel();
     }
 

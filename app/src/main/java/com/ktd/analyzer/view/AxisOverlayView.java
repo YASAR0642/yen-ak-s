@@ -116,8 +116,7 @@ public final class AxisOverlayView extends View {
         drawAxis(c,o,ey,Y_GREEN,"Y",yTicks,(i,n)->fmtXY(stepM*i),1f,true);
 
         if(!data.hasDepthData()){
-            boolean modelReady=Float.isFinite(modelDepthMeters)&&modelDepthMeters>0f
-                    &&Float.isFinite(modelAxisMeters)&&modelAxisMeters>=modelDepthMeters;
+            boolean modelReady=false; // Unverified inverse signal depth is not physical depth
             if(modelReady){
                 float[] ez=project(ox,oy,-zExtent);
                 if(visible(ez))drawDepthAxis(c,o,ez,Z_BLUE,modelAxisMeters);

@@ -168,8 +168,7 @@ public final class Volume4DView extends GLSurfaceView {
             final int NZ=layers>=5?17:(layers>=3?20:24);
             final float ZMAX=AxisOverlayView.volumeExtentFor(source);
             final boolean realDepth=source.hasDepthData();
-            final boolean modelReady=!realDepth&&Float.isFinite(modelDepthMeters)
-                    &&modelDepthMeters>0f&&Float.isFinite(modelAxisMeters)&&modelAxisMeters>=modelDepthMeters;
+            final boolean modelReady=false; // No unverified model metre on axes
             final float maxDepth=realDepth?Math.max(.05f,source.maxDepthMeters()):
                     modelReady?modelAxisMeters:1f;
             final float spread01=clamp((spread-.60f)/1.00f,0f,1f);
@@ -204,7 +203,7 @@ public final class Volume4DView extends GLSurfaceView {
                     // Gerçek bir C değeri/interpolasyonu yoksa sahte yüzey derinliği üretme.
                     if(!Float.isFinite(depthM)){
                         // Ham anomali verisiyle yalnız göreli hacim çizimi; metre üretmez.
-                        depthM=modelReady?modelDepthMeters:.50f;
+                        depthM=.50f; // Relative display centre, never physical 0.50m
                     }
                     depthM=clamp(depthM,0f,maxDepth);
                     float centerNorm=clamp(depthM/maxDepth,0f,1f);
