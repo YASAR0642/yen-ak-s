@@ -1,64 +1,61 @@
-
-name: KTD 3D ANALYZER v3.9.8 APK Derle
+name: KTD Android APK - Otomatik Derleme
 
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
+    branches: [main]
+    paths:
+      - 'app/**'
+      - 'build.gradle'
+      - 'settings.gradle'
+      - 'gradle.properties'
+      - 'gradle/**'
+      - '.github/workflows/main.yml'
 
 permissions:
   contents: read
 
 jobs:
-  android-apk:
-    name: Android Debug APK
+  apk:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
-
+    timeout-minutes: 35
     steps:
-      - name: Kaynak kodunu al
+      - name: Projeyi indir
         uses: actions/checkout@v4
 
-      - name: Java 17 ayarla
+      - name: Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Gradle 8.9 ayarla
+      - name: Android SDK - Hazir runner kullan
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK_DIR="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          echo "ANDROID_HOME=$SDK_DIR" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK_DIR" >> "$GITHUB_ENV"
+          MANAGER="$SDK_DIR/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$MANAGER" ]; then echo "sdkmanager bulunamadi: $MANAGER"; exit 1; fi
+          if [ ! -f "$SDK_DIR/platforms/android-35/android.jar" ] || [ ! -d "$SDK_DIR/build-tools/35.0.0" ]; then
+            yes | "$MANAGER" --sdk_root="$SDK_DIR" --licenses >/dev/null || true
+            "$MANAGER" --sdk_root="$SDK_DIR" 'platforms;android-35' 'build-tools;35.0.0'
+          fi
+
+      - name: Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
 
-      - name: Android SDK kontrol et
-        shell: bash
-        run: |
-          set -e
-          SDK_DIR="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
-          echo "ANDROID_HOME=$SDK_DIR" >> "$GITHUB_ENV"
-          echo "ANDROID_SDK_ROOT=$SDK_DIR" >> "$GITHUB_ENV"
-          "$SDK_DIR/cmdline-tools/latest/bin/sdkmanager" \
-            --sdk_root="$SDK_DIR" --install \
-            "platforms;android-35" \
-            "build-tools;35.0.0" \
-            "platform-tools"
-
-      - name: Android proje yapisini kontrol et
-        shell: bash
-        run: |
-          test -f settings.gradle
-          test -f app/build.gradle
-          echo "Android proje dosyalari bulundu."
-
-      - name: APK derle
+      - name: Derle
         run: gradle --no-daemon --stacktrace :app:assembleDebug
 
-      - name: APK dosyasini yukle
+      - name: APK paketle
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: KTD-3D-ANALYZER-v3.9.8-APK
+          name: KTD-Android-APK-${{ github.run_number }}
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 30
