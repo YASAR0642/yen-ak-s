@@ -246,7 +246,7 @@ public final class AxisOverlayView extends View {
                 c.drawText(fmtDepth(d),x-nx*dp(12f),y-ny*dp(12f)+sp(3f),p);
             }
         }
-        p.setStyle(Paint.Style.FILL);p.setTextSize(sp(12.5f));p.setFakeBoldText(true);p.setTextAlign(Paint.Align.CENTER);p.setColor(color);p.setAlpha(255);c.drawText(data!=null&&(data.rulerDerivedDepth||!data.hasDepthData())?"Z≈":"Z",b[0]+ux*dp(12f),b[1]+uy*dp(12f)+sp(4f),p);p.setFakeBoldText(false);
+        p.setStyle(Paint.Style.FILL);p.setTextSize(sp(12.5f));p.setFakeBoldText(true);p.setTextAlign(Paint.Align.CENTER);p.setColor(color);p.setAlpha(255);c.drawText(data!=null&&(data.rulerDerivedDepth||!data.hasDepthData())?"Z indeks":"Z",b[0]+ux*dp(12f),b[1]+uy*dp(12f)+sp(4f),p);p.setFakeBoldText(false);
     }
 
     private static float niceDepthStep(float max){

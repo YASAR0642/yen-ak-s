@@ -61,7 +61,7 @@ public final class ScanGridContourView extends View {
 
     private void drawContour(Canvas c,RectF a){
         if(data.count==0){p.setColor(Color.rgb(8,22,30));c.drawRect(a,p);return;}
-        DenseField d=DenseField.from(data,56);Bitmap b=Bitmap.createBitmap(d.w,d.h,Bitmap.Config.ARGB_8888);
+        DenseFieldClassic d=DenseFieldClassic.from(data,56);Bitmap b=Bitmap.createBitmap(d.w,d.h,Bitmap.Config.ARGB_8888);
         float scale=Math.max(10f,d.robustAbs);
         for(int y=0;y<d.h;y++)for(int x=0;x<d.w;x++){
             int i=y*d.w+x;

@@ -166,6 +166,9 @@ public final class AnalysisActivity extends Activity {
         boolean modelReady=hasModelDepth();
         if(levelSeek!=null)levelSeek.setEnabled(available);
         if(levelLabel==null)return;
+        if(showing4D && visualData!=null && visualData.rulerDerivedDepth){
+            levelLabel.setText("4D Z: 800/Z göreli indeks (metre değil)");return;
+        }
         if(!available&&!modelReady){
             levelLabel.setText("Z: göreli hacim (derinlik yok)");return;
         }
@@ -303,7 +306,7 @@ public final class AnalysisActivity extends Activity {
         }
         if(surface!=null)surface.onPause();if(volume4d!=null)volume4d.onPause();
         showing4D=true;
-        visualData=ReferenceInverseDepth.createVisualDepth(data);
+        visualData=ReferenceInverseDepth.createRelativeIndexVolume(data);
         host.removeAllViews();volume4d=new Volume4DView(this);volume4d.setData(visualData);volume4d.setPalette(palette);
         volume4d.setSmoothing(Prefs.smoothing(this));volume4d.setWireframe(Prefs.grid(this));
         volume4d.setThreshold(Math.max(.06f,volumeLevel/anomalyGain));volume4d.setDepthFocusMeters(depthSliceMeters);

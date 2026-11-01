@@ -352,6 +352,8 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
         manualSampleRequested=false;lastCapture=now;
         int[] q=cellForIndex(index);int line=index/data.rows,point=index%data.rows;
         data.put(q[0],q[1],frame,ref.visualDelta(rawSignal));
+        // C = 800/Z is a derived signal index, not measured metres.
+        if(Float.isFinite(rawSignal)&&rawSignal>0f){data.c[q[0]][q[1]]=com.ktd.analyzer.data.InverseSignalIndex.fromRaw(rawSignal);data.depth[q[0]][q[1]]=Float.NaN;data.cIsDerivedFromRaw=true;data.derivedCDivisor=800;}
         NeutralExperimentalDepth.apply(data);
         index++;
         analysisGeneration++;gridDepthResult=null;
