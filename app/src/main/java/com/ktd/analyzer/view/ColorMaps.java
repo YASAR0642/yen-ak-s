@@ -8,10 +8,10 @@ import android.graphics.Color;
  * 8-13: kullanıcı tarafından sağlanan CLR paletlerinin uygulamaya aktarılmış karşılıkları.
  */
 public final class ColorMaps {
-    public static final int COUNT=11;
+    public static final int COUNT=12;
     public static final String[] NAMES={
         "KTD Spectrum", "Siyah / Beyaz", "Neon", "Termal", "Buz",
-        "Bakır", "Viridis", "Boşluk İçi Metal", "KTD VOLENDER", "ODA", "Malzeme"
+        "Bakır", "Viridis", "Boşluk İçi Metal", "KTD VOLENDER", "ODA", "Malzeme", "Visualizer Klasik"
     };
     private ColorMaps(){}
 
@@ -67,6 +67,7 @@ public final class ColorMaps {
             case 8: return opaque(P9.color(u));
             case 9: return opaque(P10.color(u));
             case 10:return opaque(P12.color(u));
+            case 11:return opaque(diverging(t,Color.rgb(6,25,165),Color.rgb(0,190,240),Color.rgb(0,150,10),Color.rgb(255,230,0),Color.rgb(255,100,0)));
             default:return opaque(diverging(t,Color.rgb(20,55,170),Color.rgb(10,145,210),Color.rgb(75,215,55),Color.rgb(245,225,35),Color.rgb(255,45,20)));
         }
     }

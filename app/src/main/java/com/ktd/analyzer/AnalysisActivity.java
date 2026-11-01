@@ -107,7 +107,11 @@ public final class AnalysisActivity extends Activity {
         mode3Button.setOnClickListener(v->showSurface());mode4Button.setOnClickListener(v->show4D());
         Button settingsButton=Ui.button(this,"GÖRÜNÜM",false);Ui.fitText(settingsButton,10,13,1);
         settingsButton.setOnClickListener(v->showSceneSettings());
-        modes.addView(mode3Button,Ui.weight(1f));modes.addView(mode4Button,Ui.weight(1f));modes.addView(settingsButton,Ui.weight(.85f));
+        Button resetView=Ui.button(this,"KAMERA",false);Ui.fitText(resetView,10,13,1);
+        resetView.setOnClickListener(v->{if(volume4d!=null)volume4d.resetCamera();
+            if(surface!=null)showSurface();});
+        modes.addView(mode3Button,Ui.weight(1f));modes.addView(mode4Button,Ui.weight(1f));
+        modes.addView(settingsButton,Ui.weight(.95f));modes.addView(resetView,Ui.weight(.85f));
         root.addView(modes,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,52)));
         depthHeadline=null;depthDetail=null;
 

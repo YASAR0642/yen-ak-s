@@ -26,7 +26,7 @@ public final class ScanGridContourView extends View {
     private final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
     private ScanData data;
     private int palette=0,activeRow=-1,activeCol=-1,startCorner=0,overlayMode=OVERLAY_NONE;
-    private boolean serpentine=true;
+    private boolean serpentine=true, smoothMap=true;
     private MagneticDepthEstimator.Result depthModel;
     private int[][] capturedColors;
     private boolean[][] captured;
@@ -39,6 +39,7 @@ public final class ScanGridContourView extends View {
     public void setPalette(int v){palette=v;capturedFor=null;invalidate();}
     public void setActiveCell(int r,int c){activeRow=r;activeCol=c;invalidate();}
     public void setTraversal(int corner,boolean zigzag){startCorner=corner;serpentine=zigzag;invalidate();}
+    public void setSmoothMap(boolean enabled){smoothMap=enabled;invalidate();}
     public void setOverlayMode(int mode){overlayMode=mode;invalidate();}
     public void setDepthModel(MagneticDepthEstimator.Result result){depthModel=result;invalidate();}
 
@@ -69,6 +70,22 @@ public final class ScanGridContourView extends View {
         if(capturedFor!=data || capturedPalette!=palette || capturedColors==null || capturedColors.length!=data.rows || capturedColors[0].length!=data.cols){
             capturedFor=data;capturedPalette=palette;
             capturedColors=new int[data.rows][data.cols];captured=new boolean[data.rows][data.cols];
+        }
+        // Harita modu: ham kayıtlar değişmeden, komşu örneklerden sürekli yüzey.
+        // Henüz ölçülmemiş kareler daima boş bırakılır.
+        if(smoothMap && data.count>=4){
+            DenseFieldClassic field=DenseFieldClassic.from(data,Math.min(96,Math.max(36,data.cols*9)),false);
+            Bitmap bmp=Bitmap.createBitmap(field.w,field.h,Bitmap.Config.ARGB_8888);
+            int[] pixels=new int[field.w*field.h];
+            for(int y=0;y<field.h;y++)for(int x=0;x<field.w;x++){
+                int i=y*field.w+x;
+                if(!field.valid[i]){pixels[i]=Color.rgb(3,10,15);continue;}
+                int col=ColorMaps.color(palette,field.value[i],FIXED_DELTA_COLOR_RANGE);
+                pixels[i]=col;
+            }
+            bmp.setPixels(pixels,0,field.w,0,0,field.w,field.h);
+            p.setStyle(Paint.Style.FILL);p.setAlpha(255);p.setFilterBitmap(true);
+            c.drawBitmap(bmp,null,a,p);bmp.recycle();return;
         }
         final float cw=a.width()/data.cols, ch=a.height()/data.rows;
         p.setStyle(Paint.Style.FILL);p.setAlpha(255);
@@ -128,7 +145,7 @@ public final class ScanGridContourView extends View {
             p.setTextSize(size);
             float x=a.left+(co+.5f)*cw;
             float y=a.top+(r+.5f)*ch-(p.ascent()+p.descent())*.5f;
-            int bg=ColorMaps.color(palette,data.delta[r][co],Math.max(10f,data.maxAbs()));
+            int bg=ColorMaps.color(palette,data.delta[r][co],FIXED_DELTA_COLOR_RANGE);
             double lum=.2126*Color.red(bg)+.7152*Color.green(bg)+.0722*Color.blue(bg);
             int front=lum<135?Color.WHITE:Color.BLACK;
             int back=lum<135?Color.BLACK:Color.WHITE;
