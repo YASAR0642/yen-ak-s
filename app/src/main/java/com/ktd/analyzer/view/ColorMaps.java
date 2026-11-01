@@ -8,10 +8,10 @@ import android.graphics.Color;
  * 8-13: kullanıcı tarafından sağlanan CLR paletlerinin uygulamaya aktarılmış karşılıkları.
  */
 public final class ColorMaps {
-    public static final int COUNT=12;
+    public static final int COUNT=13;
     public static final String[] NAMES={
         "KTD Spectrum", "Siyah / Beyaz", "Neon", "Termal", "Buz",
-        "Bakır", "Viridis", "Boşluk İçi Metal", "KTD VOLENDER", "ODA", "Malzeme", "Visualizer Klasik"
+        "Bakır", "Viridis", "Boşluk İçi Metal", "KTD VOLENDER", "ODA", "Malzeme", "Visualizer Klasik", "GER / KTD Anomali"
     };
     private ColorMaps(){}
 
@@ -67,9 +67,31 @@ public final class ColorMaps {
             case 8: return opaque(P9.color(u));
             case 9: return opaque(P10.color(u));
             case 10:return opaque(P12.color(u));
+            case 12:return gerKtdAnomaly(value);
             case 11:return opaque(diverging(t,Color.rgb(6,25,165),Color.rgb(0,190,240),Color.rgb(0,150,10),Color.rgb(255,230,0),Color.rgb(255,100,0)));
             default:return opaque(diverging(t,Color.rgb(20,55,170),Color.rgb(10,145,210),Color.rgb(75,215,55),Color.rgb(245,225,35),Color.rgb(255,45,20)));
         }
+    }
+
+    /**
+     * GER/KTD yorumsal renklendirme. Sifir = yesil, negatif = mavi,
+     * pozitif = sari/turuncu/kirmizi. Bu metot yalniz sinyal buyuklugunu
+     * kodlar: mineral, demir, mezar, oda veya kup teshisi YAPMAZ.
+     * Tum 2D/3D/4D yuzeylerinde ayni sabit Z delta esikleri kullanilir.
+     */
+    private static int gerKtdAnomaly(float delta){
+        if(!Float.isFinite(delta))return Color.rgb(0,150,18);
+        float d=Math.max(-120f,Math.min(120f,delta));
+        final int green=Color.rgb(0,153,17);
+        if(d < -10f){
+            float t=Math.min(1f,(-d-10f)/70f);
+            return lerp(green,Color.rgb(0,43,215),Math.min(1f,t*2.2f));
+        }
+        if(d <= 10f)return green;
+        if(d < 38f)return lerp(green,Color.rgb(255,238,0),(d-10f)/28f);
+        if(d < 66f)return lerp(Color.rgb(255,238,0),Color.rgb(255,123,0),(d-38f)/28f);
+        if(d < 92f)return lerp(Color.rgb(255,123,0),Color.rgb(240,15,12),(d-66f)/26f);
+        return lerp(Color.rgb(240,15,12),Color.rgb(150,0,0),(d-92f)/28f);
     }
 
     public static int recommendedAlpha(int palette){ return 255; }

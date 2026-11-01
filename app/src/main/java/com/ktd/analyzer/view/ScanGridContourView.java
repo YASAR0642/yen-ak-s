@@ -74,7 +74,7 @@ public final class ScanGridContourView extends View {
         // Harita modu: ham kayıtlar değişmeden, komşu örneklerden sürekli yüzey.
         // Henüz ölçülmemiş kareler daima boş bırakılır.
         if(smoothMap && data.count>=4){
-            DenseFieldClassic field=DenseFieldClassic.from(data,Math.min(96,Math.max(36,data.cols*9)),false);
+            DenseFieldClassic field=DenseFieldClassic.from(data,Math.min(96,Math.max(48,data.cols*10)),true);
             Bitmap bmp=Bitmap.createBitmap(field.w,field.h,Bitmap.Config.ARGB_8888);
             int[] pixels=new int[field.w*field.h];
             for(int y=0;y<field.h;y++)for(int x=0;x<field.w;x++){
