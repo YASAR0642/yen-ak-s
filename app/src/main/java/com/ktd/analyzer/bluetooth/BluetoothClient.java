@@ -3,6 +3,7 @@ package com.ktd.analyzer.bluetooth;
 import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.Context;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
@@ -21,6 +22,8 @@ import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Uygulama genelinde TEK Classic Bluetooth SPP bağlantısı.
@@ -36,6 +39,12 @@ public final class BluetoothClient {
     private static volatile boolean gprLineMode=false;
     private static final ExecutorService EXEC=Executors.newSingleThreadExecutor();
     private static final Object LOCK=new Object();
+    private static final ScheduledExecutorService RETRY=Executors.newSingleThreadScheduledExecutor();
+    private static volatile Context appContext;
+    private static volatile String savedAddress="";
+    private static volatile boolean manualDisconnect=false;
+    private static volatile boolean retryPending=false;
+    private static volatile BluetoothDevice preferredDevice;
     private static volatile BluetoothSocket socket;
     private static volatile boolean reading=false,connecting=false;
     private static volatile String state="Bluetooth bağlı değil";
@@ -75,7 +84,23 @@ public final class BluetoothClient {
         if(Build.VERSION.SDK_INT>=31 && !hasConnectPermission(a))a.requestPermissions(new String[]{Manifest.permission.BLUETOOTH_CONNECT},code);
     }
 
+    /** Call when the app starts; reconnect previously selected SPP device. */
+    public void reconnectSaved(Activity a){
+        appContext=a.getApplicationContext();
+        if(!hasConnectPermission(a)) { requestConnectPermission(a,4001); return; }
+        BluetoothAdapter ad=BluetoothAdapter.getDefaultAdapter();
+        if(ad==null || !ad.isEnabled())return;
+        savedAddress=appContext.getSharedPreferences("ktd_bt",Context.MODE_PRIVATE).getString("last_mac","");
+        if(savedAddress.isEmpty() || isConnected() || connecting)return;
+        try{
+            BluetoothDevice d=ad.getRemoteDevice(savedAddress);
+            if(d.getBondState()==BluetoothDevice.BOND_BONDED){
+                preferredDevice=d;manualDisconnect=false;connect(d);
+            }
+        }catch(Exception ignored){}
+    }
     public void pickPaired(Activity a){
+        appContext=a.getApplicationContext();
         if(isConnected()){broadcastState("Bağlı: "+connectedName());return;}
         if(!hasConnectPermission(a)){requestConnectPermission(a,4001);broadcastState("Bluetooth izni gerekli");return;}
         BluetoothAdapter ad=BluetoothAdapter.getDefaultAdapter();
@@ -85,11 +110,20 @@ public final class BluetoothClient {
         if(set==null||set.isEmpty()){broadcastState("Eşleşmiş cihaz yok");return;}
         ArrayList<BluetoothDevice> devs=new ArrayList<>(set);String[] names=new String[devs.size()];
         for(int i=0;i<devs.size();i++){BluetoothDevice d=devs.get(i);names[i]=safeName(d);}
-        new AlertDialog.Builder(a).setTitle("Bluetooth cihazı").setItems(names,(d,w)->connect(devs.get(w))).setNegativeButton("İptal",null).show();
+        new AlertDialog.Builder(a).setTitle("Bluetooth cihazı").setItems(names,(d,w)->{
+            BluetoothDevice chosen=devs.get(w);
+            savedAddress=chosen.getAddress();
+            appContext.getSharedPreferences("ktd_bt",Context.MODE_PRIVATE).edit().putString("last_mac",savedAddress).apply();
+            preferredDevice=chosen;manualDisconnect=false;
+            connect(chosen);
+        }).setNegativeButton("İptal",null).show();
     }
 
     public void connect(BluetoothDevice d){
+        if(d==null || isConnected())return;
         synchronized(LOCK){if(connecting)return;connecting=true;}
+        preferredDevice=d;
+        manualDisconnect=false;
         disconnectInternal(false); broadcastState("Bağlanıyor: "+safeName(d));
         EXEC.submit(()->{
             try{
@@ -97,14 +131,38 @@ public final class BluetoothClient {
                 try{ s=d.createRfcommSocketToServiceRecord(SPP);s.connect(); }
                 catch(Exception first){ try{ if(s!=null)s.close(); }catch(Exception ignored){} s=d.createInsecureRfcommSocketToServiceRecord(SPP);s.connect(); }
                 socket=s;deviceName=safeName(d);reading=true;connecting=false;
+                retryPending=false;
                 broadcastState("Bağlı: "+deviceName+" • X/Y/Z/C bekleniyor");
                 readLoop(s.getInputStream());
             }catch(Exception e){connecting=false;broadcastState("Bağlantı kurulamadı: "+shortMsg(e));}
-            finally{if(reading)disconnectInternal(true);}
+            finally{
+                disconnectInternal(true);
+                scheduleReconnect();
+            }
         });
     }
 
-    public void disconnect(){disconnectInternal(false);broadcastState("Bluetooth bağlı değil");}
+    public void disconnect(){
+        manualDisconnect=true;
+        disconnectInternal(false);
+        broadcastState("Bluetooth bağlı değil");
+    }
+    private static void scheduleReconnect(){
+        if(manualDisconnect || preferredDevice==null || retryPending || isConnected())return;
+        retryPending=true;
+        RETRY.schedule(()->{
+            retryPending=false;
+            if(manualDisconnect || isConnected() || connecting)return;
+            Context c=appContext;
+            if(c==null)return;
+            try{
+                BluetoothAdapter a=BluetoothAdapter.getDefaultAdapter();
+                if(a==null || !a.isEnabled())return;
+                if(Build.VERSION.SDK_INT>=31 && c.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT)!=PackageManager.PERMISSION_GRANTED)return;
+                new BluetoothClient(null).connect(preferredDevice);
+            }catch(Exception ignored){}
+        },3,TimeUnit.SECONDS);
+    }
 
     /** Telefonda ÖRNEK AL gibi komutları bağlı SPP cihazına yollar. */
     public boolean send(String text){

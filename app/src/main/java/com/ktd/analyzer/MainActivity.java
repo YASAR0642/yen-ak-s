@@ -41,6 +41,7 @@ public final class MainActivity extends Activity implements BluetoothClient.List
     protected void onStart() {
         super.onStart();
         bt.activate();
+        bt.reconnectSaved(this);
         refreshBluetooth();
     }
 

@@ -293,13 +293,14 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
     private void requestSample(){
         if(!BluetoothClient.isConnected()){Toast.makeText(this,"Bluetooth bağlantısı yok",Toast.LENGTH_SHORT).show();bt.pickPaired(this);return;}
         if(data.full()){Toast.makeText(this,"Tarama tamamlandı. Yeni Tarama seçin.",Toast.LENGTH_SHORT).show();return;}
+        if(manualSampleRequested)return; // one outstanding button press at a time
         int[] q=cellForIndex(index);
         if(q[0]<0||q[1]<0)return;
         // Uygulamanın kanonik koordinatı: X daima ileri yön, Y yan sıra yönüdür.
         float xCoord=(data.rows-1-q[0])*data.stepCm/100f;
         float yCoord=(data.startCorner==1?(data.cols-1-q[1]):q[1])*data.stepCm/100f;
         manualSampleRequested=true;
-        String cmd=String.format(Locale.US,"SAMPLE X=%.2f Y=%.2f\n",xCoord,yCoord);
+        String cmd=String.format(Locale.US,"SAMPLE X=%.0f Y=%.0f\n",xCoord*100f,yCoord*100f);
         boolean sent=bt.send(cmd);
         if(!sent)manualSampleRequested=false;
         Toast.makeText(this,sent?"Tek örnek istendi":"Örnek komutu gönderilemedi",Toast.LENGTH_SHORT).show();
@@ -331,18 +332,18 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
         float signal=f.signal();
         float rawSignal=coerceRawSignal(signal);
         if(Float.isNaN(rawSignal))return;
-        SensorFrame frame=f.hasXYZC?new SensorFrame(f.x,f.y,rawSignal,f.c):new SensorFrame(rawSignal);
+        SensorFrame frame=f.hasXYZC?new SensorFrame(f.x/100f,f.y/100f,rawSignal,f.c):new SensorFrame(rawSignal);
         lastFrame=frame;
 
         // İlk yeni sinyal ve her manuel SIFIRLA sonrası ilk yeni sinyal yalnız referanstır; gride yazılmaz.
-        if(awaitZero||!ref.hasReference()){
-            acceptReference(rawSignal);
-            return;
-        }
+        // Reference is only taken by the FIRST explicit SAMPLE button response (REF:512).
+        if(awaitZero||!ref.hasReference())return;
 
-        if(!running||data.full())return;
+        if(!running||data.full()||!manualSampleRequested)return;
         long now=System.currentTimeMillis();
-        if(now<linePauseUntil)return;
+        // Manual mode: button is the only trigger; do not skip user-requested samples
+        // on automatic line/voice delays.
+        // if(now<linePauseUntil)return;
         int interval=Prefs.voiceGuide(this)?Math.max(650,Prefs.intervalMs(this)):Math.max(250,Prefs.intervalMs(this));
         boolean force=manualSampleRequested;
         boolean firstGridSample=index==0;
@@ -382,9 +383,9 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
         }
         ref.zero(raw);data.reference=raw;awaitZero=false;
         voice.setEnabled(Prefs.voiceGuide(this));voice.say("Yeni çekim ortam referansı alındı.");
-        if(BluetoothClient.isConnected()){
-            bt.send("RATE=20\n");bt.send("LIVE_START\n");
-        }
+        // 3D zemin tarama NEVER calls LIVE_START: first manual SAMPLE is only REF.
+        // Subsequent SAMPLE commands receive exactly one new measurement.
+        manualSampleRequested=false;
         lastCapture=0;
         applyOverlayMode();
     }

@@ -17,6 +17,9 @@ import java.util.List;
  * Renkler 3D yüzeyle aynı ColorMaps paletinden, opak ve canlı çizilir.
  */
 public final class UltrasoundView extends View {
+    private com.ktd.analyzer.PerfMonitor perfMonitor;
+    public void setPerfMonitor(com.ktd.analyzer.PerfMonitor p){perfMonitor=p;}
+
     private static final int N = 2400;
     private final float[] d = new float[N];
     private final boolean[] used = new boolean[N];
@@ -68,6 +71,9 @@ public final class UltrasoundView extends View {
      * history (the previous implementation recalculated its scale every frame).
      */
     @Override protected void onDraw(Canvas c){
+        long monitorDrawStart=perfMonitor==null?0:perfMonitor.drawBegin();
+        try {
+
         super.onDraw(c);
         final int w=getWidth(), h=getHeight();
         if(w<=0||h<=0||count==0)return;
@@ -144,5 +150,7 @@ public final class UltrasoundView extends View {
         p.setFilterBitmap(true);
         c.drawBitmap(bm,null,new android.graphics.Rect(0,0,w,h),p);
         bm.recycle();
+    
+        } finally {if(perfMonitor!=null)perfMonitor.drawEnd(monitorDrawStart);}
     }
 }

@@ -17,7 +17,7 @@ public final class MagneticTracePanelsView extends View {
     private float startX, startGain;
     @Override public boolean onTouchEvent(MotionEvent e){
         if(getHeight()<=0)return false;
-        int panel=Math.max(0,Math.min(3,(int)(4*e.getY()/getHeight())));
+        int panel=Math.max(0,Math.min(4,(int)(5*e.getY()/getHeight())));
         switch(e.getActionMasked()){
             case MotionEvent.ACTION_DOWN: activePanel=panel;startX=e.getX();startGain=radar.getDepthGain(panel); return true;
             case MotionEvent.ACTION_MOVE:
@@ -36,8 +36,8 @@ public final class MagneticTracePanelsView extends View {
         int w=getWidth(),h=getHeight();
         pen.setStyle(Paint.Style.FILL);pen.setColor(Color.rgb(1,6,9));canvas.drawRect(0,0,w,h,pen);
         List<GprProtocol.Trace> tr=radar.snapshot();
-        for(int box=0;box<4;box++){
-            float y0=box*h/4f,y1=(box+1)*h/4f;
+        for(int box=0;box<5;box++){
+            float y0=box*h/5f,y1=(box+1)*h/5f;
             pen.setStyle(Paint.Style.STROKE);pen.setStrokeWidth(dp*.7f);pen.setColor(Color.rgb(60,94,110));canvas.drawRect(1,y0+1,w-1,y1-1,pen);
             float centerX=w*.5f; pen.setColor(Color.rgb(138,50,49));canvas.drawLine(centerX,y0+6*dp,centerX,y1-8*dp,pen);
             pen.setStyle(Paint.Style.FILL);pen.setTypeface(android.graphics.Typeface.MONOSPACE);pen.setTextSize(dp*9.5f);pen.setColor(Color.rgb(185,215,230));canvas.drawText("G"+(box+1)+"  "+String.format(java.util.Locale.US,"%.1f×",radar.getDepthGain(box)),4*dp,y0+12*dp,pen);
@@ -45,7 +45,7 @@ public final class MagneticTracePanelsView extends View {
             int at=tr.size()-1; short[] samples=tr.get(at).samples; int count=samples.length;
             if(radar.hasTimeAxis()&&Double.isFinite(radar.getTimeWindowNs())) count=Math.max(2,Math.min(count,1+(int)(radar.getTimeWindowNs()/radar.getSampleIntervalNs())));
             int max=1; for(GprProtocol.Trace t:tr){ for(int i=0;i<Math.min(count,t.samples.length);i++) max=Math.max(max,Math.abs((int)t.samples[i])); }
-            int start=box*count/4; int end=Math.max(start+1,(box+1)*count/4);
+            int start=box*count/5; int end=Math.max(start+1,(box+1)*count/5);
             float lim=Math.max(2,(y1-y0)-24*dp); float halfW=(w-14*dp)*.43f; float oldX=centerX,oldY=y0+18*dp;
             pen.setStyle(Paint.Style.STROKE);pen.setColor(Color.WHITE);pen.setStrokeWidth(dp*.9f);
             for(int i=start;i<end;i++){

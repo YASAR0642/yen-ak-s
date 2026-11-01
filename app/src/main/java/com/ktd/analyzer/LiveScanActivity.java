@@ -34,6 +34,8 @@ import java.util.ArrayList;
  */
 public final class LiveScanActivity extends Activity implements BluetoothClient.Listener {
     private BluetoothClient bt;
+    private final PerfMonitor perfMonitor=new PerfMonitor();
+    private TextView performanceText;
     private final ReferenceModel ref = new ReferenceModel();
     private SensorFrame last, replayToIgnore;
     private TextView connectionBox, cls;
@@ -50,7 +52,7 @@ public final class LiveScanActivity extends Activity implements BluetoothClient.
 
     private boolean autoZeroDone = false;
     private boolean liveRunning = false;
-    private boolean wantLive = true;
+    private boolean wantLive = false;
 
     /*
      * Bluetooth'tan gelen paketler kaybolmadan kuyruğa alınır.
@@ -62,6 +64,7 @@ public final class LiveScanActivity extends Activity implements BluetoothClient.
     private final Handler ui = new Handler(Looper.getMainLooper());
     private final Object queueLock = new Object();
     private final ArrayDeque<SensorFrame> pending = new ArrayDeque<>();
+    private final ArrayDeque<Long> pendingTimes = new ArrayDeque<>();
     private boolean flushScheduled = false;
 
     @Override protected void onCreate(Bundle b) {
@@ -73,23 +76,27 @@ public final class LiveScanActivity extends Activity implements BluetoothClient.
 
     @Override protected void onStart() {
         super.onStart();
-        wantLive = true;
+        wantLive = false;
         liveRunning = false;
         autoZeroDone = false;
         ref.clear();
         replayToIgnore = BluetoothClient.lastFrame();
         bt.activate();
         refreshConnection();
-        startLiveIfPossible();
+        // Reconnecting BT must NEVER start NORMAL without user START.
+        if(BluetoothClient.isConnected()) bt.send("LIVE_STOP\n");
+        updateLiveButton();
     }
 
     @Override protected void onStop() {
+        perfMonitor.stop();
         if(BluetoothClient.isConnected()) bt.send("LIVE_STOP\n");
         liveRunning = false;
+        getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         updateLiveButton();
         bt.release();
         ui.removeCallbacks(flushRunnable);
-        synchronized(queueLock){ pending.clear(); flushScheduled=false; }
+        synchronized(queueLock){ pending.clear();pendingTimes.clear(); flushScheduled=false; }
         super.onStop();
     }
 
@@ -109,6 +116,15 @@ public final class LiveScanActivity extends Activity implements BluetoothClient.
         FrameLayout.LayoutParams blp = new FrameLayout.LayoutParams(Ui.dp(this,54),Ui.dp(this,42),Gravity.END|Gravity.CENTER_VERTICAL);
         top.addView(back,blp);
         root.addView(top,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,56)));
+        LinearLayout perfRow=new LinearLayout(this);perfRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        Button perfButton=Ui.button(this,"TEST",false);
+        perfRow.addView(perfButton,new LinearLayout.LayoutParams(Ui.dp(this,66),Ui.dp(this,34)));
+        performanceText=Ui.text(this,"",10,Color.rgb(178,243,255));
+        performanceText.setVisibility(android.view.View.GONE);
+        perfRow.addView(performanceText,new LinearLayout.LayoutParams(0,Ui.dp(this,34),1));
+        perfButton.setOnClickListener(v->perfMonitor.toggle(performanceText));
+        root.addView(perfRow,new LinearLayout.LayoutParams(-1,Ui.dp(this,35)));
+
 
         connectionBox = Ui.text(this,"Bluetooth bağlı değil",13,Color.WHITE);
         connectionBox.setGravity(Gravity.CENTER);
@@ -170,6 +186,7 @@ public final class LiveScanActivity extends Activity implements BluetoothClient.
         magneticFilters.setVisibility(android.view.View.GONE);
         root.addView(magneticFilters);
         ultrasound = new UltrasoundView(this); ultrasound.setPalette(Prefs.palette(this));ultrasound.setGain(liveGain);
+        ultrasound.setPerfMonitor(perfMonitor);
         root.addView(ultrasound,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,0,1));
 
         HorizontalScrollView ps = new HorizontalScrollView(this); ps.setHorizontalScrollBarEnabled(false);
@@ -231,6 +248,7 @@ public final class LiveScanActivity extends Activity implements BluetoothClient.
         bt.send("RATE=20\n");
         if(bt.send("LIVE_START\n")){
             liveRunning=true;
+            getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
             updateLiveButton();
         }
     }
@@ -244,6 +262,7 @@ public final class LiveScanActivity extends Activity implements BluetoothClient.
             wantLive=false;
             if(bt.send("LIVE_STOP\n")){
                 liveRunning=false;
+                getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
                 updateLiveButton();
                 Toast.makeText(this,"Canlı tarama durduruldu",Toast.LENGTH_SHORT).show();
             }
@@ -263,6 +282,7 @@ public final class LiveScanActivity extends Activity implements BluetoothClient.
     }
 
     @Override public void onFrame(SensorFrame f){
+        perfMonitor.received();
         if(f==null || !liveRunning)return;
         if(replayToIgnore!=null && f==replayToIgnore){ replayToIgnore=null; return; }
         replayToIgnore=null;
@@ -272,8 +292,8 @@ public final class LiveScanActivity extends Activity implements BluetoothClient.
         SensorFrame nf=f.hasXYZC?new SensorFrame(f.x,f.y,z,f.c):new SensorFrame(z);
 
         synchronized(queueLock){
-            while(pending.size()>=MAX_PENDING)pending.removeFirst();
-            pending.addLast(nf);
+            while(pending.size()>=MAX_PENDING){pending.removeFirst();pendingTimes.removeFirst();perfMonitor.dropped();}
+            pending.addLast(nf);pendingTimes.addLast(System.nanoTime());
             if(!flushScheduled){
                 flushScheduled=true;
                 ui.postDelayed(flushRunnable,UI_FRAME_MS);
@@ -283,9 +303,10 @@ public final class LiveScanActivity extends Activity implements BluetoothClient.
 
     private final Runnable flushRunnable=new Runnable(){
         @Override public void run(){
+            long pStart=perfMonitor.processBegin();
             ArrayList<SensorFrame> batch=new ArrayList<>();
             synchronized(queueLock){
-                while(!pending.isEmpty())batch.add(pending.removeFirst());
+                while(!pending.isEmpty()){batch.add(pending.removeFirst());if(!pendingTimes.isEmpty())perfMonitor.queueWaitNs(System.nanoTime()-pendingTimes.removeFirst());}
                 flushScheduled=false;
             }
             if(batch.isEmpty())return;
@@ -307,7 +328,7 @@ public final class LiveScanActivity extends Activity implements BluetoothClient.
                 visualDeltas.add(ref.visualDelta(z));
             }
 
-            if(!visualFrames.isEmpty())ultrasound.addBatch(visualFrames,visualDeltas);
+            if(!visualFrames.isEmpty()){ultrasound.addBatch(visualFrames,visualDeltas);}
 
             if(newest!=null){
                 String k=ref.classify(newest.signal()); cls.setText(k);
@@ -327,6 +348,7 @@ public final class LiveScanActivity extends Activity implements BluetoothClient.
                     ui.postDelayed(this,UI_FRAME_MS);
                 }
             }
+            perfMonitor.recordBatch(System.nanoTime()-pStart,batch.size());
         }
     };
 
@@ -335,8 +357,10 @@ public final class LiveScanActivity extends Activity implements BluetoothClient.
             refreshConnection();
             if(!BluetoothClient.isConnected()){
                 liveRunning=false;
+                wantLive=false;
+                getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
                 updateLiveButton();
-            }else startLiveIfPossible();
+            } // Bluetooth reconnect never auto-starts a scan.
         });
     }
 }

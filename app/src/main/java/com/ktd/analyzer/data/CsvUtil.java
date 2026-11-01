@@ -69,8 +69,8 @@ public final class CsvUtil {
         for(int r=0;r<d.rows;r++)for(int co=0;co<d.cols;co++)if(d.filled[r][co]){
             float z=Float.isFinite(d.z[r][co])?d.z[r][co]:d.raw[r][co];
             float receivedC=d.c[r][co];
-            float c=Float.isFinite(receivedC)&&receivedC>=0f?receivedC:InverseSignalIndex.fromRaw(z);
-            pw.printf(Locale.US,"%s,%s,%s,%s%n",n(d.x[r][co]),n(d.y[r][co]),n(z),n(c));
+            float c=Float.isFinite(receivedC)&&receivedC>0f?receivedC:Float.NaN;
+            pw.printf(Locale.US,"%s,%s,%s,%s%n",n(d.x[r][co]*100f),n(d.y[r][co]*100f),n(z),n(c));
         }
         pw.flush();
         if(pw.checkError())throw new java.io.UncheckedIOException(new IOException("CSV yazma hatasi"));
