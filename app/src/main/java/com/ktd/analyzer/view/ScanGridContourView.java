@@ -28,10 +28,15 @@ public final class ScanGridContourView extends View {
     private int palette=0,activeRow=-1,activeCol=-1,startCorner=0,overlayMode=OVERLAY_NONE;
     private boolean serpentine=true;
     private MagneticDepthEstimator.Result depthModel;
+    private int[][] capturedColors;
+    private boolean[][] captured;
+    private ScanData capturedFor;
+    private int capturedPalette=-1;
+    private static final float FIXED_DELTA_COLOR_RANGE=120f;
 
     public ScanGridContourView(Context c){super(c);setBackgroundColor(Color.rgb(3,10,15));}
-    public void setData(ScanData d){data=d;invalidate();}
-    public void setPalette(int v){palette=v;invalidate();}
+    public void setData(ScanData d){data=d;capturedFor=null;invalidate();}
+    public void setPalette(int v){palette=v;capturedFor=null;invalidate();}
     public void setActiveCell(int r,int c){activeRow=r;activeCol=c;invalidate();}
     public void setTraversal(int corner,boolean zigzag){startCorner=corner;serpentine=zigzag;invalidate();}
     public void setOverlayMode(int mode){overlayMode=mode;invalidate();}
@@ -61,14 +66,22 @@ public final class ScanGridContourView extends View {
 
     private void drawContour(Canvas c,RectF a){
         if(data.count==0){p.setColor(Color.rgb(8,22,30));c.drawRect(a,p);return;}
-        DenseFieldClassic d=DenseFieldClassic.from(data,56);Bitmap b=Bitmap.createBitmap(d.w,d.h,Bitmap.Config.ARGB_8888);
-        float scale=Math.max(10f,d.robustAbs);
-        for(int y=0;y<d.h;y++)for(int x=0;x<d.w;x++){
-            int i=y*d.w+x;
-            int col=d.valid[i]?ColorMaps.color(palette,d.value[i],scale):Color.rgb(7,18,25);
-            b.setPixel(x,y,col);
+        if(capturedFor!=data || capturedPalette!=palette || capturedColors==null || capturedColors.length!=data.rows || capturedColors[0].length!=data.cols){
+            capturedFor=data;capturedPalette=palette;
+            capturedColors=new int[data.rows][data.cols];captured=new boolean[data.rows][data.cols];
         }
-        p.setFilterBitmap(true);p.setAlpha(255);c.drawBitmap(b,null,a,p);p.setAlpha(255);b.recycle();
+        final float cw=a.width()/data.cols, ch=a.height()/data.rows;
+        p.setStyle(Paint.Style.FILL);p.setAlpha(255);
+        for(int row=0;row<data.rows;row++)for(int col=0;col<data.cols;col++){
+            if(!data.filled[row][col])continue;
+            if(!captured[row][col]){
+                // Fixed comparison scale: later samples NEVER recolor earlier captures.
+                capturedColors[row][col]=ColorMaps.color(palette,data.delta[row][col],FIXED_DELTA_COLOR_RANGE);
+                captured[row][col]=true;
+            }
+            p.setColor(capturedColors[row][col]);
+            c.drawRect(a.left+col*cw,a.top+row*ch,a.left+(col+1)*cw,a.top+(row+1)*ch,p);
+        }
     }
 
     private void drawGrid(Canvas c,RectF a){

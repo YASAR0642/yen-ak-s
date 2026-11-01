@@ -44,7 +44,10 @@ public final class LiveScanActivity extends Activity implements BluetoothClient.
     private boolean gprStyle=false;
     private Button normalMode,gprMode;
     private TextView depthInfo,gainLabel;
-    private float liveGain=1f;
+    private float liveGain=1.0f;
+    private long referenceBeginMs=0L;
+    private double referenceAccum=0;
+    private int referenceCount=0;
     // These controls apply ONLY to the magnetic GPR-style visualization.
     private LinearLayout magneticFilters;
     private float broadAnomalyBoost=2f;
@@ -70,7 +73,7 @@ public final class LiveScanActivity extends Activity implements BluetoothClient.
     @Override protected void onCreate(Bundle b) {
         super.onCreate(b);
         bt = new BluetoothClient(this);
-        liveGain=Prefs.anomalyGain(this);
+        liveGain=1.0f; // NORMAL: fixed conservative display gain
         build();
     }
 
@@ -206,7 +209,8 @@ public final class LiveScanActivity extends Activity implements BluetoothClient.
         });
         gainRow.addView(gainLabel,new LinearLayout.LayoutParams(Ui.dp(this,110),Ui.dp(this,40)));
         gainRow.addView(gainSeek,new LinearLayout.LayoutParams(0,Ui.dp(this,40),1));
-        root.addView(gainRow,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,44)));
+        // NORMAL mode gain control hidden and locked at 1.0x; no persisted user gain.
+        gainRow.setVisibility(android.view.View.GONE);
         LinearLayout bar = new LinearLayout(this); bar.setGravity(Gravity.CENTER);
         liveToggle = Ui.button(this,"DURDUR",true);
         Button zero = Ui.button(this,"SIFIRLA",false);
@@ -269,6 +273,10 @@ public final class LiveScanActivity extends Activity implements BluetoothClient.
         }else{
             wantLive=true;
             autoZeroDone=false; ref.clear();
+            referenceBeginMs=android.os.SystemClock.elapsedRealtime();
+            referenceAccum=0; referenceCount=0;
+            ultrasound.clear();
+            cls.setText("ORTAM REFERANSI • 2 sn");
             startLiveIfPossible();
             Toast.makeText(this,"Canlı tarama başlatıldı",Toast.LENGTH_SHORT).show();
         }
@@ -277,6 +285,7 @@ public final class LiveScanActivity extends Activity implements BluetoothClient.
     /** SIFIRLA'dan sonra ilk YENİ paket ortam referansı olur; eski paketi kullanmaz. */
     private void manualZero() {
         autoZeroDone=false; ref.clear();
+        referenceBeginMs=android.os.SystemClock.elapsedRealtime(); referenceAccum=0; referenceCount=0;
         if(depthInfo!=null)depthInfo.setText("— m");
         Toast.makeText(this,"Sıradaki yeni sinyal ortam referansı alınacak",Toast.LENGTH_SHORT).show();
     }
@@ -320,9 +329,13 @@ public final class LiveScanActivity extends Activity implements BluetoothClient.
                 float z=nf.signal();
                 last=nf; newest=nf;
                 if(!autoZeroDone){
-                    ref.zero(z); autoZeroDone=true;
+                    referenceAccum+=z;referenceCount++;
+                    if(android.os.SystemClock.elapsedRealtime()-referenceBeginMs<2000L)continue;
+                    ref.zero((float)(referenceAccum/Math.max(1,referenceCount)));
+                    autoZeroDone=true;
+                    cls.setText("REFERANS TAMAM • CANLI");
                     if(depthInfo!=null)depthInfo.setText("— m");
-                    continue;
+                    continue; // last reference sample must not appear on chart
                 }
                 visualFrames.add(nf);
                 visualDeltas.add(ref.visualDelta(z));

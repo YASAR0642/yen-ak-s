@@ -39,7 +39,7 @@ public final class Volume4DView extends GLSurfaceView {
     public Volume4DView(Context c){
         super(c);setEGLContextClientVersion(2);setEGLConfigChooser(8,8,8,8,16,0);
         renderer=new Renderer4D();setRenderer(renderer);setRenderMode(RENDERMODE_WHEN_DIRTY);
-        scaler=new ScaleGestureDetector(c,new ScaleGestureDetector.SimpleOnScaleGestureListener(){@Override public boolean onScale(ScaleGestureDetector d){renderer.zoom=clamp(renderer.zoom*d.getScaleFactor(),.48f,3.0f);syncAxes();requestRender();return true;}});
+        scaler=new ScaleGestureDetector(c,new ScaleGestureDetector.SimpleOnScaleGestureListener(){@Override public boolean onScale(ScaleGestureDetector d){renderer.zoom=clamp(renderer.zoom*d.getScaleFactor(),.24f,6.0f);syncAxes();requestRender();return true;}});
     }
     public void setData(ScanData d){renderer.data=d;renderer.dirty=true;if(axisOverlay!=null)axisOverlay.setData(d);requestRender();}
     public void notifyDataChanged(){renderer.dirty=true;requestRender();}
@@ -73,8 +73,8 @@ public final class Volume4DView extends GLSurfaceView {
             if(e.getPointerCount()>=2){
                 float mx=(e.getX(0)+e.getX(1))*.5f,my=(e.getY(0)+e.getY(1))*.5f;
                 float unit=2.8f/Math.max(1f,Math.min(getWidth(),getHeight()));
-                renderer.panX+=(mx-lastMidX)*unit/Math.max(.48f,renderer.zoom);
-                renderer.panY-=(my-lastMidY)*unit/Math.max(.48f,renderer.zoom);
+                renderer.panX+=(mx-lastMidX)*unit/Math.max(.24f,renderer.zoom);
+                renderer.panY-=(my-lastMidY)*unit/Math.max(.24f,renderer.zoom);
                 lastMidX=mx;lastMidY=my;syncAxes();requestRender();return true;
             }
             renderer.yaw=wrap(renderer.yaw+(e.getX()-lastX)*.38f);
