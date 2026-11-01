@@ -8,10 +8,10 @@ import android.graphics.Color;
  * 8-13: kullanıcı tarafından sağlanan CLR paletlerinin uygulamaya aktarılmış karşılıkları.
  */
 public final class ColorMaps {
-    public static final int COUNT=13;
+    public static final int COUNT=14;
     public static final String[] NAMES={
         "KTD Spectrum", "Siyah / Beyaz", "Neon", "Termal", "Buz",
-        "Bakır", "Viridis", "Boşluk İçi Metal", "KTD VOLENDER", "ODA", "Malzeme", "Visualizer Klasik", "GER / KTD Anomali"
+        "Bakır", "Viridis", "Boşluk İçi Metal", "KTD VOLENDER", "ODA", "Malzeme", "Visualizer Klasik", "GER / KTD Anomali", "KTD 6 Renk Deney"
     };
     private ColorMaps(){}
 
@@ -68,6 +68,7 @@ public final class ColorMaps {
             case 9: return opaque(P10.color(u));
             case 10:return opaque(P12.color(u));
             case 12:return gerKtdAnomaly(value);
+            case 13:return experimentalSix(value);
             case 11:return opaque(diverging(t,Color.rgb(6,25,165),Color.rgb(0,190,240),Color.rgb(0,150,10),Color.rgb(255,230,0),Color.rgb(255,100,0)));
             default:return opaque(diverging(t,Color.rgb(20,55,170),Color.rgb(10,145,210),Color.rgb(75,215,55),Color.rgb(245,225,35),Color.rgb(255,45,20)));
         }
@@ -92,6 +93,30 @@ public final class ColorMaps {
         if(d < 66f)return lerp(Color.rgb(255,238,0),Color.rgb(255,123,0),(d-38f)/28f);
         if(d < 92f)return lerp(Color.rgb(255,123,0),Color.rgb(240,15,12),(d-66f)/26f);
         return lerp(Color.rgb(240,15,12),Color.rgb(150,0,0),(d-92f)/28f);
+    }
+
+    /**
+     * Deneysel GORSEL yorum paleti; malzeme / bosluk tespiti DEGILDIR.
+     * Tum modlarda sabit, isaretli referans farki (Z delta) birimleri:
+     * d<=-35 mavi, -10..10 yesil, 10..30 sari, 30..55 turuncu,
+     * 55..75 koyu kontur, >=75 kirmizi. Koyu kontur demir kaniti DEGILDIR.
+     */
+    private static int experimentalSix(float d){
+        if(!Float.isFinite(d))return Color.rgb(0,150,17);
+        final int blue=Color.rgb(0,58,205);
+        final int green=Color.rgb(0,165,35);
+        final int yellow=Color.rgb(255,225,0);
+        final int orange=Color.rgb(244,119,0);
+        final int black=Color.rgb(15,13,16);
+        final int red=Color.rgb(239,19,18);
+        if(d<=-35f)return blue;
+        if(d<-10f)return lerp(blue,green,(d+35f)/25f);
+        if(d<=10f)return green;
+        if(d<30f)return lerp(green,yellow,(d-10f)/20f);
+        if(d<55f)return lerp(yellow,orange,(d-30f)/25f);
+        if(d<75f)return lerp(orange,black,(d-55f)/20f);
+        if(d<90f)return lerp(black,red,(d-75f)/15f);
+        return red;
     }
 
     public static int recommendedAlpha(int palette){ return 255; }

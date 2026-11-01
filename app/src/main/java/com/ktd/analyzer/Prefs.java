@@ -40,7 +40,7 @@ public final class Prefs {
     public static String prefix(Context c){ return p(c).getString("prefix", "KTD_SCAN"); }
     public static int palette(Context c){
         int v=p(c).getInt("palette",0);
-        return (v>=0 && v<=10)?v:0;
+        return (v>=0 && v<com.ktd.analyzer.view.ColorMaps.COUNT)?v:13;
     }
 
     /** Kullanıcı yalnız X/Y/adım/yön seçer; alan boyutu uygulama içinde otomatik hesaplanır. */

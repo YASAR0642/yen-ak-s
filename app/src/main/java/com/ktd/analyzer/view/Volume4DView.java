@@ -233,7 +233,7 @@ public final class Volume4DView extends GLSurfaceView {
                 float u=clamp((px+1.12f)/2.24f,0f,1f);
                 float vv=clamp((1.02f-py)/2.04f,0f,1f);
                 float raw=sampleDense(dense,u,vv);
-                int col=ColorMaps.color(palette,raw,colorScale);
+                int col=ColorMaps.color(palette,raw,palette==13?120f:colorScale);
                 colors.add(Color.red(col)/255f);
                 colors.add(Color.green(col)/255f);
                 colors.add(Color.blue(col)/255f);

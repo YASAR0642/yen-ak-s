@@ -1,0 +1,23 @@
+KTD v3.9.63 KISMI GUNCELLEME
+
+BU PAKET YALNIZCA v3.9.62'YE GORE DEGISEN 7 JAVA DOSYASINI VE 1 KILAVUZU ICERIR.
+
+ONEMLI: GitHub sayfasina ZIP dosyasini yuklemek, icindeki dosyalari kendi kendine acmaz.
+Repo koku yerine her dosyayi ZIP icindeki AYNI KLASORE yerlestir.
+
+GitHub deposunda su klasore git:
+app/src/main/java/com/ktd/analyzer/
+Buraya Prefs.java yukle/eskisiyle degistir.
+
+Ardindan bu alt klasore git:
+app/src/main/java/com/ktd/analyzer/view/
+Buraya su 6 dosyayi yukle/eskileriyle degistir:
+ColorMaps.java
+IsoSurfaceView.java
+PaletteStripView.java
+ProSurfaceGLView.java
+Surface3DView.java
+Volume4DView.java
+
+GitHub Actions > Run workflow ile APK derle.
+Bu paket tek basina Android projesi degildir, var olan v3.9.62 kaynaklarinin UZERINE uygulanir.

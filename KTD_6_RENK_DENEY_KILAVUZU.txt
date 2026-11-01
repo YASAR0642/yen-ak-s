@@ -1,0 +1,38 @@
+KTD 3D ANALYZER v3.9.63 - ALTI RENK DENEYI
+
+1) GUNCELLEME
+Bu paket v3.9.62 uzerine kurulmustur. GitHub'a proje icerigini yukleyip Actions ile APK derleyin.
+ESP32 V10 firmware degisikligi YOKTUR.
+
+2) DENEME GORUNUMU
+Palet cubugunda sadece 6 secenek gosterilir. Son secenek (en sag) KTD 6 Renk Deney'dir.
+Eski 14 palet kodu korunur. Yeni kurulumda palet varsayilan 13, daha once kaydedilmis secim korunur.
+2D'de HARITA YUMUSAK secin. Ayni imzali referans farki 2D/3D/4D icin sabit olcekle renklendirilir.
+Renk anlamlari YALNIZ DENEYSEL GORSEL ETIKETLERDIR:
+  d <= -35        Mavi: guclu negatif manyetik fark
+  -35 ... -10     Mavi/yesil gecis
+  -10 ... +10     Yesil: referansa yakin
+  +10 ... +30     Yesil/sari: hafif pozitif manyetik fark
+  +30 ... +55     Sari/turuncu: orta pozitif fark
+  +55 ... +75     Turuncu/koyu kontur: guclu pozitif fark
+  +75 ... +90     Koyu/kirmizi gecis
+  >= +90          Kirmizi: cok guclu pozitif fark
+Koyu kontur demir bulgusu, mavi bosluk, sari kazilmis toprak, turuncu tas duvar,
+kirmizi demir disi metal TANISI DEGILDIR.
+
+3) KONTROLLU SAHA TESTI
+A) Bilinen temiz zemin: 2 tekrar tarama, koordinat/yukseklik/yon sabit.
+B) Aynı zeminde yeri bilinen, guvenli ve yasal bir metal test nesnesi (iki tekrar).
+C) Mümkünse uzman gozetiminde ayri bir bilinen dolgu/zemin bozulmasi test alani.
+D) Her tekrar CSV kaydi al. Ham Z, referans farki, 2D/3D/4D goruntuleri birlikte sakla.
+E) Pozitif-negatif degisimler ile hedef yeri eslesiyor mu, yalanci pozitif var mi karsilastir.
+NOT: Metal turu, mezar/bosluk, tas duvar ve yer alti metre derinligi EMS100 ile tek basina kesin belirlenemez.
+
+4) KORUNANLAR
+Sensor okuma, Bluetooth paketleri, ornek alma koordinatlari, kayitli ham veriler,
+3D/4D derinlik indeks gorunumleri ve GMR algoritmasi degistirilmedi.
+Bu nedenle 2D ve 3D/4D'deki renkler ortak olmasina ragmen derinlik hesaplarinin
+bilimsel olarak ayni veya dogrulanmis metre oldugu iddia edilemez.
+
+5) DURUM
+ZIP kaynak dosya testleri yapildi. Tam Android/Gradle APK derlemesi ve saha testi yapilmadi.
