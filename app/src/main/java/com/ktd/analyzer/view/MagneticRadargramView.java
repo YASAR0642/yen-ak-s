@@ -145,7 +145,7 @@ public final class MagneticRadargramView extends View {
         canvas.drawColor(Color.rgb(2,7,10));
         int w=getWidth(),h=getHeight();
         float dp=getResources().getDisplayMetrics().density;
-        int left=(int)(42*dp),right=(int)(58*dp),top=(int)(28*dp),bottom=(int)(8*dp);
+        int left=(int)(65*dp),right=(int)(57*dp),top=(int)(28*dp),bottom=(int)(8*dp);
         int ww=Math.max(1,w-left-right),hh=Math.max(1,h-top-bottom);
         p.setStyle(Paint.Style.FILL);p.setColor(Color.BLACK);canvas.drawRect(left,top,left+ww,top+hh,p);
         List<GprProtocol.Trace> items=snapshot();
@@ -181,7 +181,7 @@ public final class MagneticRadargramView extends View {
             canvas.drawBitmap(bmp,new Rect(0,0,visibleN,rows),new Rect(left,top,left+drawnW,top+hh),p);
             bmp.recycle();
         }
-        // Horizontal axis is REAL received observation index, not distance.
+        // Horizontal axis is the received observation index, not measured distance.
         label.setTextAlign(Paint.Align.CENTER);
         label.setTextSize(10*getResources().getDisplayMetrics().scaledDensity);
         label.setColor(Color.rgb(238,237,178));
@@ -193,20 +193,23 @@ public final class MagneticRadargramView extends View {
         }
         p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(dp*.65f);p.setColor(Color.rgb(85,111,125));
         canvas.drawRect(left,top,left+ww,top+hh,p);
-        // Every vertical value is an OBSERVATION FROM THE PREVIOUS 256
-        // measurements. Do not label this axis as metres or actual depth.
+        // Left: observation number. Right: the project 800/Z display scale (0..5 m).
+        // It is not an independently measured GPR time-of-flight depth.
         float axisX=left+ww;
         p.setStyle(Paint.Style.FILL);p.setColor(Color.BLACK);canvas.drawRect(axisX,top-4*dp,w,top+hh+2*dp,p);
         label.setTextAlign(Paint.Align.CENTER);label.setColor(Color.rgb(118,234,229));
-        canvas.drawText("ORNEK",axisX+right*.5f,top-9*dp,label);
-        final int steps=8;
+        canvas.drawText("MT",axisX+right*.5f,top-9*dp,label);
+        canvas.drawText("ÖRNEK",left*.5f,top-9*dp,label);
+        label.setTextAlign(Paint.Align.RIGHT);label.setColor(Color.rgb(238,237,178));
+        canvas.drawText(Integer.toString(firstSample+Math.max(1,visibleN)),left-4*dp,top+14*dp,label);
+        final int steps=10;
         for(int i=0;i<=steps;i++){
             float y=top+hh*i/(float)steps;
             p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(dp*.55f);p.setColor(Color.argb(45,190,215,235));canvas.drawLine(left,y,axisX,y,p);
             p.setColor(Color.rgb(61,83,96));canvas.drawLine(axisX,y,w,y,p);
-            int sampleIndex=(int)Math.round((visibleSamples-1)*i/(double)steps);
+            double meter=5.0*i/steps;
             label.setTextAlign(Paint.Align.RIGHT);label.setColor(Color.rgb(205,224,238));
-            canvas.drawText(Integer.toString(sampleIndex),w-3*dp,y+(i==0?10*dp:i==steps?-2*dp:4*dp),label);
+            canvas.drawText(String.format(java.util.Locale.US,"%.1f",meter),w-3*dp,y+(i==0?10*dp:i==steps?-2*dp:4*dp),label);
         }
         for(int x=1;x<8;x++){float cx=left+x*ww/8f;p.setColor(Color.argb(65,145,168,183));canvas.drawLine(cx,top,cx,top+hh,p);}    
     

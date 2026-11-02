@@ -1,0 +1,15 @@
+KTD 3D ANALYZER v3.9.69 - GMR ANOMALI AKISI
+
+Degisiklikler:
+- TEST, GORSEL MOD, OLCUM MODU satiri kaldirildi.
+- Yapay hiperbol ureten eski appendIllustrative rutini kaldirildi.
+- Her Bluetooth okumasi tek bir yatay kolon ekler.
+- O kolon icindeki bozulma bandinin merkezi, Z=512 + referans farki ve 800/Z proje hesabi ile 0..5 metre cizelgesine yerlestirilir.
+- Metre cetveli sagda 0.0 ile 5.0 arasinda; ORNEK solda.
+- Sadece belirli esigin ustundeki anomaliler gosteriir (2 gradyan birimi). Kazanc ve mevcut 5 panel korunur.
+- BLE/SPP veri formati, dosya ac/kaydet ve ESP32 kodu degistirilmedi.
+
+ONEMLI: Manyetik sensor tek basina gercek yer alti derinligini olcmez. 800/Z bu projede tercih edilen gorsellestirme haritalamasidir; elde edilen 2.6 m etiketi gercek hedef derinliginin deneysel kaniti degildir. Hedef uzunlugu da yurumeye ait konum olcer olmadan metreye cevrilemez; yatay eksen ornek numarasidir.
+
+GitHub'a yuklemek icin ZIP'i acin, 100'den az dosyayi deponun kokune klasor yapisini koruyarak yukleyin.
+APK derlemesi ve saha testi bu ortamda dogrulanmamistir.
