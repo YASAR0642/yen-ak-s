@@ -1,0 +1,7 @@
+KTD 3D ANALYZER 3.9.71
+Kılavuz 01 ve 07 eski bölümleri kaldırıldı. Donanım anlatımı kaldırıldı.
+Örnek istendi bildirimi gizlendi. Analiz ekranı alan, pozitif/negatif deneysel puanlar ve 800/Z değerine indirildi.
+Puanlar bilimsel hedef olasılığı değildir, gerçek metal veya boşluğu kesin teşhis etmez.
+10x10 -> 9 m2; 15x10 -> 13.5 m2 (30 cm adım).
+GitHub deposunun kök klasörüne ZIP açılmış proje dosyalarını yükleyin; ZIP arşivini direkt yüklemeyin.
+Derleme ve cihaz testi yapılmadı.

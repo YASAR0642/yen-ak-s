@@ -47,6 +47,8 @@ import java.util.Locale;
  */
 public final class ScanActivity extends Activity implements BluetoothClient.Listener {
     private BluetoothClient bt;
+    // Same operation as the screen's ORNEK AL button, coordinated on the Android side.
+    private final BluetoothClient.HardwareSampleListener hardwareSampleListener=()->runOnUiThread(()->requestSample());
     private final ReferenceModel ref=new ReferenceModel();
     private final Handler handler=new Handler(Looper.getMainLooper());
     private VoiceGuide voice;
@@ -81,6 +83,7 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
         // O paket yeni taramanın referansı sayılmaz; ilk GERÇEK yeni paket beklenir.
         replayToIgnore=BluetoothClient.lastFrame();
         bt.activate();
+        BluetoothClient.addHardwareSampleListener(hardwareSampleListener);
         updateConnectionButton();
         ensureGroundMode();
     }
@@ -89,7 +92,7 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
         if(data!=null)data.depthCalibrationFactor=1f;
         if(gridView!=null)gridView.invalidate();
     }
-    @Override protected void onStop(){bt.release();super.onStop();}
+    @Override protected void onStop(){BluetoothClient.removeHardwareSampleListener(hardwareSampleListener);bt.release();super.onStop();}
     @Override protected void onDestroy(){handler.removeCallbacksAndMessages(null);if(voice!=null)voice.shutdown();super.onDestroy();}
 
     private void newData(){
@@ -321,7 +324,7 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
         String cmd=String.format(Locale.US,"SAMPLE X=%.0f Y=%.0f\n",xCoord*100f,yCoord*100f);
         boolean sent=bt.send(cmd);
         if(!sent){manualSampleRequested=false;pendingRequestedAtMs=0;}
-        Toast.makeText(this,sent?"Tek örnek istendi":"Örnek komutu gönderilemedi",Toast.LENGTH_SHORT).show();
+        if(!sent)Toast.makeText(this,"Örnek komutu gönderilemedi",Toast.LENGTH_SHORT).show();
     }
 
     @Override public void onFrame(SensorFrame f){runOnUiThread(()->consume(f));}

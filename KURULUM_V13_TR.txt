@@ -1,0 +1,20 @@
+KTD v3.9.73 — Fiziksel butonla koordinatli 3D ornekleme
+
+ANDROID: ZIP icerigini Github deponuzun ana klasorune yukleyin.
+ESP32: Ayrica verilen V13 ZIP icindeki .ino dosyasini Arduino IDE ile yukleyin.
+
+ESP32 GPIO27 -> normalde acik buton -> GND (INPUT_PULLUP).
+Sensorler dikey araligi 30 cm; tarama yatay adimi 30 cm olarak kalir.
+
+3D ZEMIN TARAMA
+- Tarama ekraninda Bluetooth baglantisini kurun.
+- Butona ILK basista sadece yeni referans alinir, hicbir kare dolmaz.
+- Daha sonraki her fiziksel basista Android, siradaki hucrenin X/Y'sini
+  ESP32'ye SAMPLE komutuyla yollar, tek bir yeni okuma ayni hucreye kaydedilir.
+- Telefonda ORNEK AL dugmesi de ayni davranir.
+- 6 saniye icinde yanit gelmezse sonraki basista yeniden deneyebilirsiniz.
+- Butona basili tutmak tekrar tekrar olcum baslatmaz (50ms debounce).
+- Bluetooth bagli degilse ESP32 konumlu bir ornek kaydetmez.
+
+NOT: Android'de tam proje kaynagi, ESP32'de tam .ino mevcuttur.
+Bu ortamda derleme veya fiziksel donanim testi yapilmamistir.

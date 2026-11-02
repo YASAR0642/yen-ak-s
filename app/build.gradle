@@ -8,8 +8,8 @@ android {
         applicationId 'com.ktd.analyzer'
         minSdk 23
         targetSdk 35
-        versionCode 3970
-        versionName '3.9.70-kilavuz-analiz' 
+        versionCode 3972
+        versionName '3.9.72-30cm-tek-sinyal' 
     }
 
     buildTypes {

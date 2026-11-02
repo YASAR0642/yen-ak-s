@@ -1,0 +1,25 @@
+KTD 3D ANALYZER v3.9.72 - 30 CM SENSOR ARALIGI + FIZIKSEL TEK SINYAL
+
+ESP32 V12: firmware/KTD_EMS100_V12_30CM_TEK_SINYAL/KTD_EMS100_V12_30CM_TEK_SINYAL.ino
+
+1) Dikey ust ve alt EMS100 arasindaki 75 cm mesafeyi 30 cm yapin.
+2) ESP32 GPIO27 ile GND arasina anlik (normalde acik) buton baglayin.
+   ESP32'nin INPUT_PULLUP'u kullanilir; GPIO27'ye 5V BAGLAMAYIN.
+3) Arduino IDE'de kart ESP32 Dev Module (klasik ESP32-WROOM-32).
+4) GPIO27 butonuna basildiginda 50ms debounce ile yalniz bir olcum paketi
+   yayinlanir; arka arkaya saniyede otomatik olcum gonderilmez.
+5) 3D grid taramasinda X/Y koordinati uygulamadan gelir; buton o modda
+   paket gondermez. Kare kaydetmek icin uygulamadaki ORNEK AL kullanin.
+6) Canli akista BAŞLAT aktifken buton ek paket gondermez. Canli tarama
+   durdugunda buton bir sensor paketi gonderebilir, fakat Android NORMAL
+   ekrani BAŞLAT disinda gelen paketleri goruntulemez. Tek basista telefonda
+   gorunen GRID kaydi isteniyorsa Android ve ESP32 icin ayrica protokol gerekir.
+7) ADS1115 A0/A1/A2/A3 ve Bluetooth Z,C,ADC10 protokolleri degismedi.
+8) Sensor mesafesi uygulamanin 30 cm XY ornekleme adimi DEĞILDIR.
+9) Z=512 + (alt-ust sensör farki)/2mV aynen korundu. SENSOR_SEPARATION_M
+   .30 olarak kaydedildi; BASELINE? USB komutunda mV/m diagnostigi hesaplanir.
+   30cm sensor araliginda olculen gradyan genligi 75cm ile ayni olmayabilir.
+10) Android uygulamasi yalnizca surum numarasi acisindan guncellendi.
+
+ESP32 seri monitor: 115200 baud. BASELINE? ve SINGLE komutlari vardir.
+ZIP GitHub deposunun ana dizinine acilarak yuklenmelidir.

@@ -33,6 +33,11 @@ public final class BluetoothClient {
     public interface Listener { void onState(String s); void onFrame(SensorFrame f); }
     /** CANLI GPR için yalnız etkin modda dağıtılan çerçevelenmiş ASCII paketleri. */
     public interface GprLineListener { void onGprLine(String line); }
+    /** ESP32 physical button notifies the active 3D scan screen. */
+    public interface HardwareSampleListener { void onHardwareSample(); }
+    private static final CopyOnWriteArraySet<HardwareSampleListener> HARDWARE_SAMPLE_LISTENERS=new CopyOnWriteArraySet<>();
+    public static void addHardwareSampleListener(HardwareSampleListener l){if(l!=null)HARDWARE_SAMPLE_LISTENERS.add(l);}
+    public static void removeHardwareSampleListener(HardwareSampleListener l){if(l!=null)HARDWARE_SAMPLE_LISTENERS.remove(l);}
     private static final UUID SPP = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
     private static final CopyOnWriteArraySet<Listener> LISTENERS=new CopyOnWriteArraySet<>();
     private static final CopyOnWriteArraySet<GprLineListener> GPR_LISTENERS=new CopyOnWriteArraySet<>();
@@ -179,12 +184,26 @@ public final class BluetoothClient {
     private static void readLoop(InputStream in)throws Exception{
         byte[] buf=new byte[2048];SensorStreamDecoder decoder=new SensorStreamDecoder();
         StringBuilder lineBuffer=new StringBuilder();
+        StringBuilder buttonLineBuffer=new StringBuilder();
         boolean lastWasGpr=false;
         while(reading){
             int n=in.read(buf);if(n<0)break;if(n==0)continue;
             boolean nowGpr=gprLineMode;
             if(nowGpr!=lastWasGpr){lineBuffer.setLength(0);decoder=new SensorStreamDecoder();lastWasGpr=nowGpr;}
             String chunk=new String(buf,0,n,StandardCharsets.UTF_8);
+            // Read hardware trigger independently of the sensor decoder; do not fabricate a data frame.
+            if(!nowGpr){
+                for(int k=0;k<chunk.length();k++){
+                    char ch=chunk.charAt(k);
+                    if(ch=='\n'||ch=='\r'){
+                        if(buttonLineBuffer.length()>0){
+                            String line=buttonLineBuffer.toString().trim();buttonLineBuffer.setLength(0);
+                            if(line.equals("BUTTON_SAMPLE"))for(HardwareSampleListener l:HARDWARE_SAMPLE_LISTENERS)try{l.onHardwareSample();}catch(Exception ignored){}
+                        }
+                    }else if(buttonLineBuffer.length()<256){buttonLineBuffer.append(ch);}
+                    else buttonLineBuffer.setLength(0);
+                }
+            }else buttonLineBuffer.setLength(0);
             if(nowGpr){
                 for(int k=0;k<chunk.length();k++){
                     char ch=chunk.charAt(k);
