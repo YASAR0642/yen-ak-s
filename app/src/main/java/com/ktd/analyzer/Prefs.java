@@ -59,6 +59,6 @@ public final class Prefs {
     }
     public static void setVoiceGuide(Context c,boolean on){p(c).edit().putBoolean("voice_guide",on).apply();}
     public static void setPrefix(Context c,String s){ p(c).edit().putString("prefix", s==null||s.trim().isEmpty()?"KTD_SCAN":s.trim()).apply(); }
-    public static void setPalette(Context c,int v){ p(c).edit().putInt("palette",Math.max(0,Math.min(10,v))).apply(); }
+    public static void setPalette(Context c,int v){ p(c).edit().putInt("palette",Math.max(0,Math.min(com.ktd.analyzer.view.ColorMaps.COUNT-1,v))).apply(); }
     private static int clamp(int v,int a,int b){ return Math.max(a,Math.min(b,v)); }
 }

@@ -8,10 +8,10 @@ import android.graphics.Color;
  * 8-13: kullanıcı tarafından sağlanan CLR paletlerinin uygulamaya aktarılmış karşılıkları.
  */
 public final class ColorMaps {
-    public static final int COUNT=14;
+    public static final int COUNT=19;
     public static final String[] NAMES={
         "KTD Spectrum", "Siyah / Beyaz", "Neon", "Termal", "Buz",
-        "Bakır", "Viridis", "Boşluk İçi Metal", "KTD VOLENDER", "ODA", "Malzeme", "Visualizer Klasik", "GER / KTD Anomali", "KTD 6 Renk Deney"
+        "Bakır", "Viridis", "Boşluk İçi Metal", "KTD VOLENDER", "ODA", "Malzeme", "Visualizer Klasik", "GER / KTD Anomali", "KTD 6 Renk Deney", "Küp / Turuncu", "Boşluk / Mavi", "Dolgu / Buz Mavisi", "Demir / Siyah", "Metal / Kırmızı"
     };
     private ColorMaps(){}
 
@@ -69,6 +69,11 @@ public final class ColorMaps {
             case 10:return opaque(P12.color(u));
             case 12:return gerKtdAnomaly(value);
             case 13:return experimentalSix(value);
+            case 14:return targetContour(value, 0);
+            case 15:return targetContour(value, 1);
+            case 16:return targetContour(value, 2);
+            case 17:return targetContour(value, 3);
+            case 18:return targetContour(value, 4);
             case 11:return opaque(diverging(t,Color.rgb(6,25,165),Color.rgb(0,190,240),Color.rgb(0,150,10),Color.rgb(255,230,0),Color.rgb(255,100,0)));
             default:return opaque(diverging(t,Color.rgb(20,55,170),Color.rgb(10,145,210),Color.rgb(75,215,55),Color.rgb(245,225,35),Color.rgb(255,45,20)));
         }
@@ -117,6 +122,50 @@ public final class ColorMaps {
         if(d<75f)return lerp(orange,black,(d-55f)/20f);
         if(d<90f)return lerp(black,red,(d-75f)/15f);
         return red;
+    }
+
+
+    /**
+     * Hedef yorum paletleri: delta, referansa gore isaretli sensör farkidir.
+     * Bunlar madde tespiti DEGIL, sadece secilen sinyalin gorunus bicimidir.
+     * Mod 0: turuncu kup / siyah ince kontur
+     * Mod 1: mavi negatif bolge / siyah ince kontur
+     * Mod 2: acik buz mavisi negatif bolge / siyah ince kontur
+     * Mod 3: siyah pozitif bolge / turuncu ince kontur
+     * Mod 4: kirmizi merkez / sari / turuncu / siyah ince kontur
+     * Ekranlar ayni ColorMaps.color() fonksiyonunu kullandiginda tutarlidir.
+     */
+    private static int targetContour(float delta,int mode){
+        final int ground=Color.rgb(0,164,34);
+        if(!Float.isFinite(delta)) return ground;
+        // Deneysel sinyal esikleri; olculen madde turunun kaniti degildir.
+        float a=(mode==1 || mode==2) ? -delta : delta;
+        int black=Color.rgb(12,10,13);
+        int orange=Color.rgb(249,122,5);
+        int blue=Color.rgb(0,66,221);
+        int ice=Color.rgb(137,229,251);
+        int yellow=Color.rgb(255,228,5);
+        int red=Color.rgb(244,22,18);
+        // 0..10 doğal zemin, 10..23 gecis, 23..27 ince dis kontur,
+        // 27..32 gecis, 32+ hedef cekirdegi.
+        if(a<=10f) return ground;
+        if(a<20f) return lerp(ground,Color.rgb(146,199,33),(a-10f)/10f);
+        if(a<23f) return lerp(Color.rgb(146,199,33),black,(a-20f)/3f);
+        if(a<27f) return mode==3?orange:black;
+        if(mode==4){
+            if(a<32f) return lerp(black,orange,(a-27f)/5f);
+            if(a<42f) return orange;
+            if(a<52f) return lerp(orange,yellow,(a-42f)/10f);
+            if(a<62f) return lerp(yellow,red,(a-52f)/10f);
+            return red;
+        }
+        if(mode==3){
+            if(a<33f) return lerp(orange,black,(a-27f)/6f);
+            return black;
+        }
+        int core=mode==0?orange:(mode==1?blue:ice);
+        if(a<33f) return lerp(black,core,(a-27f)/6f);
+        return core;
     }
 
     public static int recommendedAlpha(int palette){ return 255; }

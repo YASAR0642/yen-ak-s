@@ -1,6 +1,7 @@
-KTD 3D ANALYZER v3.9.65 / Uzatilmis 3D ve 4D Z eksenleri
-
-Bu paket v3.9.64 uzerine uygulanir. ZIP icindeki AxisOverlayView.java dosyasini ayni klasore yukleyin.
-Z ekseni gorsel olarak 3D icin %32, 4D icin %34 uzatildi; 4D hacim kutusu ayni ortak olcegi kullanir. Z metre etiketleri arasindaki mesafe acildi. X/Y etiketleri daha seyrek gosterilir. Tam sayilar 3, 5, 10 biciminde yazilir.
-Derinlik hesaplamasi, ham sensor degerleri, Bluetooth, 2D ve renk paleti degismedi.
-APK derlemesi ve telefon testi burada yapilmadi.
+KTD v3.9.66 - 5 secilebilir deneysel hedef renk haritasi.
+Iki Java dosyasini mevcut v3.9.65 projesindeki ayni yollarina yukleyin.
+Paletler 15-19: Kup/Turuncu, Bosluk/Mavi, Dolgu/Buz Mavisi, Demir/Siyah, Metal/Kirmizi.
+Bu siniflandirmalar gercek madde tespiti DEGILDIR. Kullanicinin sectigi sinyal-kontur goruntusudur.
+2D/3D/4D ColorMaps ortak palet sistemini kullaniyor.
+Yeni tum projeyi degil yalniz iki dosyayi yukleyin.
+APK gercek derlemesi yapilmadi.
