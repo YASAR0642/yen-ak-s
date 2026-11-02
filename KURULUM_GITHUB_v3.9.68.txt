@@ -1,0 +1,18 @@
+KTD 3D ANALYZER v3.9.68 TAM GITHUB PROJESI
+
+Bu paket onceki 3.9.67 tam kaynaginin uzerine 3.9.68 GMR gorsel/olcum secimini ekler.
+ANDROID: app/, Gradle, .github/workflows/ ve tum gorsellestirme siniflari tamdir.
+ESP32: firmware/ altinda onceki kod korunmustur.
+
+KURULUM
+1) ZIP'i bilgisayarinizda bir klasore cikarin.
+2) GitHub deposunun ANA DIZININDE Add file > Upload files secin.
+3) ZIP dosyasini DEGIL; cikardiginiz .github, app, firmware klasorlerini ve
+   diger proje dosyalarini klasor yapisiyla birlikte yukleyin.
+4) Commit changes yapin.
+5) Actions sekmesinden APK is akisinin sonucunu kontrol edin.
+
+UYARI
+Bu paket 100 dosyadan azdir ancak yalnizca arşiv butunlugu dogrulanmistir;
+APK veya ESP32 firmware'i burada donanimsal testten gecmedi.
+Eski GMR hiperbol gorunumu temsili bir gorsellestirmedir, gercek GPR olcumu degildir.

@@ -59,7 +59,7 @@ public final class MagneticRadarActivity extends Activity implements BluetoothCl
     private MagneticRadargramView radar;
     private MagneticTracePanelsView panels;
     private TextView status, gainLabel, fileNameLabel;
-    private Button colorButton, mineralButton;
+    private Button colorButton, mineralButton, modeButton;
     private Button startButton;
     private boolean running=false,zeroed=false,mineral=false;
     private float gain=1f, boost=2f;
@@ -122,6 +122,15 @@ public final class MagneticRadarActivity extends Activity implements BluetoothCl
         performanceText.setVisibility(android.view.View.GONE);
         perfRow.addView(performanceText,new LinearLayout.LayoutParams(0,dp(32),1));
         perfButton.setOnClickListener(v->perfMonitor.toggle(performanceText));
+        modeButton=button("GÖRSEL MOD");
+        modeButton.setTextSize(10);
+        modeButton.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xff234f70));
+        perfRow.addView(modeButton,new LinearLayout.LayoutParams(dp(110),dp(32)));
+        modeButton.setOnClickListener(v->switchDisplayMode());
+        TextView displayNote=text("GÖRSEL: TEMSİLİ HİPERBOL • ÖLÇÜM: GERÇEK MANYETİK VERİ",9);
+        displayNote.setTextColor(0xff9eb6c7);
+        displayNote.setGravity(Gravity.CENTER_VERTICAL);
+        perfRow.addView(displayNote,new LinearLayout.LayoutParams(0,dp(32),1));
         root.addView(perfRow,new LinearLayout.LayoutParams(-1,dp(33)));
 
 
@@ -248,7 +257,124 @@ public final class MagneticRadarActivity extends Activity implements BluetoothCl
     // TRUE MEASUREMENT WATERFALL: each vertical cell is one independently received
     // magnetic observation from a rolling 256-observation history, NOT a depth bin.
     // Never synthesize hyperbolas, target shapes, extra readings or time-of-flight.
+    // Visual mode draws a SIMULATED radargram from magnetic input; measurement mode shows real history.
+    // Both use the same signed input, recording and play-back data. Neither yields radar time-of-flight.
+    private boolean illustrativeMode=true;
     private void appendDelta(float delta,boolean store){
+        if(illustrativeMode)appendIllustrative(delta,store);
+        else appendMeasured(delta,store);
+    }
+    private void switchDisplayMode(){
+        illustrativeMode=!illustrativeMode;
+        modeButton.setText(illustrativeMode?"GÖRSEL MOD":"ÖLÇÜM MODU");
+        radar.clear();sequence=0;resetDetection();
+        java.util.ArrayList<Float> existing;
+        if(fileMode)existing=new java.util.ArrayList<>(playback);
+        else synchronized(captured){existing=new java.util.ArrayList<>(captured);}
+        for(Float v:existing)if(v!=null&&Float.isFinite(v))appendDelta(v,false);
+        panels.invalidate();
+    }
+    private void appendIllustrative(float delta,boolean store){
+        if(store){synchronized(captured){captured.add(delta);}}
+        baseline=baseline*.988f+delta*.012f;
+        slowBase=slowBase*.955f+delta*.045f;
+        fastBase=fastBase*.70f+delta*.30f;
+        float driftRemoved=mineral?delta-baseline:delta;
+        float broad=mineral?slowBase-baseline:slowBase;
+        float edge=fastBase-lastDelta;
+        lastDelta=fastBase;
+        float strengthened=driftRemoved+(boost-1f)*Math.signum(broad)*Math.max(0f,Math.abs(broad)-1f);
+        double energy=Math.min(1.0,Math.abs(broad)/28.0);
+        double edgeEnergy=Math.min(1.0,Math.abs(edge)/18.0);
+
+        // Feature tracker: sustained negative anomaly => void-like hyperbola,
+        // sustained positive anomaly => metal/cup-like symmetric downward shape.
+        float detect=mineral?broad:strengthened;
+        smoothedAnomaly=smoothedAnomaly*.72f+detect*.28f;
+        int desiredKind=0;
+        if(Math.abs(smoothedAnomaly)>=3.2f) desiredKind=smoothedAnomaly<0?-1:1;
+        if(desiredKind!=0){
+            if(featureKind!=desiredKind || featureStep>=featureSpan){
+                featureKind=desiredKind;
+                featureStep=0;
+                featureSpan=18+(int)Math.round(energy*28 + Math.min(18.0,Math.abs(smoothedAnomaly)));
+                featureEnergy=(float)Math.max(0.22,Math.min(1.0,energy));
+                featurePolarity=smoothedAnomaly;
+            }else{
+                featureStep++;
+                featureEnergy=Math.max(featureEnergy*.85f,(float)energy);
+                featurePolarity=featurePolarity*.70f+smoothedAnomaly*.30f;
+            }
+        }else if(featureKind!=0){
+            featureStep++;
+            if(featureStep>=featureSpan){
+                featureKind=0; featureStep=0; featureSpan=0; featureEnergy=0; featurePolarity=0;
+            }
+        }
+
+        final int groundLimit=32; // ~0.50 m on the 0-4 MT* display ruler.
+        final double xNorm=(featureSpan>1)?(((featureStep/(double)(featureSpan-1))*2.0)-1.0):0.0;
+        short[] section=new short[256];
+        for(int i=0;i<section.length;i++){
+            double y=i;
+            double amp=0;
+
+            // Ground/top-soil band (0.00-0.50): stable layered response, suppress anomalies.
+            double layered=(Math.sin((y/256.0)*22.0 + sequence*0.22)*7 + Math.sin((y/256.0)*41.0 + sequence*0.07)*3.5)*Math.exp(-y/155.0);
+            if(y<groundLimit){
+                amp += 18 + layered*1.7;
+                amp += strengthened*10*ricker(y,groundLimit*0.55,5.0);
+                section[i]=(short)Math.max(Short.MIN_VALUE,Math.min(Short.MAX_VALUE,Math.round(amp)));
+                continue;
+            }
+
+            // Background continuity after top-soil.
+            amp += layered*0.55;
+            amp += strengthened*22*ricker(y,groundLimit+10+energy*20,8+energy*5);
+            amp += edge*18*ricker(y,groundLimit+8+edgeEnergy*12,6+edgeEnergy*4);
+
+            if(featureKind==-1){
+                // Void-like continuous anomaly: nested hyperbolas whose apex depth follows anomaly strength.
+                double apex=groundLimit+12 + featureEnergy*78;
+                double curve=24 + featureEnergy*84;
+                double mu=apex + curve*xNorm*xNorm;
+                double split=7 + featureEnergy*11;
+                double mag=Math.max(10.0,Math.abs(featurePolarity)*26.0);
+                amp += -mag*ricker(y,mu,5.0+featureEnergy*4.0);
+                amp +=  mag*0.62*ricker(y,mu+split,7.0+featureEnergy*5.0);
+                amp +=  mag*0.34*ricker(y,mu+split*1.9,9.0+featureEnergy*6.0);
+            }else if(featureKind==1){
+                // Metal / cup-like anomaly: symmetric shapes extending downward.
+                double apex=groundLimit+9 + featureEnergy*56;
+                double bowl=12 + featureEnergy*24;
+                double mag=Math.max(12.0,Math.abs(featurePolarity)*24.0);
+                for(int layer=0;layer<3;layer++){
+                    double mu=apex + layer*18 + (bowl + layer*10)*xNorm*xNorm;
+                    double sig=4.8 + layer*1.7 + featureEnergy*2.8;
+                    amp += mag*(1.0-layer*0.16)*ricker(y,mu,sig);
+                    amp += -mag*(0.46-layer*0.08)*ricker(y,mu+6+layer*4,sig*1.25);
+                }
+                amp += mag*0.18*Math.exp(-Math.abs(xNorm)*2.5)*ricker(y,apex+42,15+featureEnergy*8);
+            }else{
+                // No persistent target: soft banded response only.
+                double baseDepth=groundLimit+18 + energy*76;
+                double split=14 + edgeEnergy*18;
+                double sigma1=7 + energy*7;
+                double sigma2=10 + edgeEnergy*9;
+                amp += strengthened*42*ricker(y,baseDepth,sigma1);
+                amp += strengthened*22*ricker(y,baseDepth+split,sigma2);
+                amp += (-strengthened)*14*ricker(y,Math.max(groundLimit+6,baseDepth-split*.65),sigma1*1.15);
+            }
+
+            amp *= (0.86 + (y/255.0)*0.42);
+            if(Math.abs(amp)<1.7) amp=0;
+            section[i]=(short)Math.max(Short.MIN_VALUE,Math.min(Short.MAX_VALUE,Math.round(amp)));
+        }
+        radar.add(new GprProtocol.Trace(sequence++,section));
+        radar.setSurveyPositionCm(0);
+        panels.invalidate();
+    }
+    private void appendMeasured(float delta,boolean store){
         long perfProcessingStart=perfMonitor.processBegin();
         if(store){synchronized(captured){captured.add(delta);}}
         if(!Float.isFinite(delta)){perfMonitor.processEnd(perfProcessingStart);return;}
