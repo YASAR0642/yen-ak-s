@@ -1,0 +1,22 @@
+KTD 3D ANALYZER v3.9.67 — GITHUB TAM PROJE
+
+Bu arşiv, iki bölümden birleştirilmiştir.
+Eski sürümlere ait README metinleri kaldırılmıştır.
+Android, ESP32, Gradle, GitHub Actions, assets ve 2D/3D/4D kodları korunmuştur.
+
+KURULUM:
+1. ZIP'i bilgisayarda bir klasöre çıkart.
+2. GitHub deposunun ana (root) dizininde Add file > Upload files bölümüne git.
+3. ZIP dosyasını değil, çıkartılmış klasördeki TÜM dosyaları ve klasörleri,
+   klasör yollarını koruyarak yükle.
+4. Yükleme listesinde .github/workflows/main.yml,
+   app/build.gradle, app/src/main/AndroidManifest.xml ve
+   app/src/main/java/com/ktd/analyzer/view/Volume4DView.java
+   yolunun doğru olduğundan emin ol.
+5. Commit changes yap ve Actions iş akışını çalıştır.
+6. GitHub mevcut dosyalarla olası çakışmaları gösterirse, eski proje
+   üzerine bu sürümü yazdığından emin ol. ÖNCE depoyu yedekle.
+
+NOT: Zip dosyasını tek dosya olarak depoya yüklemek Android projesini
+derlenebilir hâle getirmez. GitHub web arayüzünde aynı anda 100'den az
+dosya yüklenmelidir.

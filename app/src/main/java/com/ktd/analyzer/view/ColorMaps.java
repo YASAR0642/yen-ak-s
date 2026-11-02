@@ -8,10 +8,10 @@ import android.graphics.Color;
  * 8-13: kullanıcı tarafından sağlanan CLR paletlerinin uygulamaya aktarılmış karşılıkları.
  */
 public final class ColorMaps {
-    public static final int COUNT=19;
+    public static final int COUNT=20;
     public static final String[] NAMES={
         "KTD Spectrum", "Siyah / Beyaz", "Neon", "Termal", "Buz",
-        "Bakır", "Viridis", "Boşluk İçi Metal", "KTD VOLENDER", "ODA", "Malzeme", "Visualizer Klasik", "GER / KTD Anomali", "KTD 6 Renk Deney", "Küp / Turuncu", "Boşluk / Mavi", "Dolgu / Buz Mavisi", "Demir / Siyah", "Metal / Kırmızı"
+        "Bakır", "Viridis", "Boşluk İçi Metal", "KTD VOLENDER", "ODA", "Malzeme", "Visualizer Klasik", "GER / KTD Anomali", "KTD 6 Renk Deney", "Küp / Turuncu", "Boşluk / Mavi", "Dolgu / Buz Mavisi", "Demir / Siyah", "Metal / Kırmızı", "KTD Polarite (+/-)"
     };
     private ColorMaps(){}
 
@@ -74,6 +74,7 @@ public final class ColorMaps {
             case 16:return targetContour(value, 2);
             case 17:return targetContour(value, 3);
             case 18:return targetContour(value, 4);
+            case 19:return polarContour(value);
             case 11:return opaque(diverging(t,Color.rgb(6,25,165),Color.rgb(0,190,240),Color.rgb(0,150,10),Color.rgb(255,230,0),Color.rgb(255,100,0)));
             default:return opaque(diverging(t,Color.rgb(20,55,170),Color.rgb(10,145,210),Color.rgb(75,215,55),Color.rgb(245,225,35),Color.rgb(255,45,20)));
         }
@@ -166,6 +167,41 @@ public final class ColorMaps {
         int core=mode==0?orange:(mode==1?blue:ice);
         if(a<33f) return lerp(black,core,(a-27f)/6f);
         return core;
+    }
+
+    /**
+     * Yeni palet 19: tek ham isaretli delta ile iki polarite gorunumu.
+     * Bir renk bir malzeme teshisi DEGILDIR. -35..-60 mavi sinyal,
+     * -60 altinda negatif cekirdek mor + lacivert + turkuaz kontur;
+     * pozitif tarafta turuncu-sari-kirmizi cekirdek gorunumu.
+     * Esikler KTD 512 merkezli GRADYAN delta birimindedir;
+     * Nano ADC10 180/200..260/366 esikleri BAMBASKA olcektir.
+     */
+    private static int polarContour(float delta){
+        final int green=Color.rgb(25,185,50);
+        final int black=Color.rgb(10,13,17);
+        if(!Float.isFinite(delta))return green;
+        if(delta<0f){
+            float a=-delta;
+            if(a<=8f)return green;
+            if(a<13f)return lerp(green,Color.rgb(10,145,245),(a-8f)/5f);
+            if(a<30f)return lerp(Color.rgb(10,145,245),Color.rgb(0,63,218),(a-13f)/17f);
+            if(a<44f)return Color.rgb(0,63,218); // mavi negatif bolge
+            if(a<48f)return lerp(Color.rgb(0,63,218),black,(a-44f)/4f);
+            if(a<52f)return black; // ince ayirma konturu
+            if(a<61f)return lerp(Color.rgb(0,222,230),Color.rgb(7,34,130),(a-52f)/9f);
+            if(a<76f)return lerp(Color.rgb(7,34,130),Color.rgb(145,30,220),(a-61f)/15f);
+            return Color.rgb(166,35,235); // guclu NEGATIF cekirdek
+        }
+        float a=delta;
+        if(a<=8f)return green;
+        if(a<14f)return lerp(green,Color.rgb(255,166,0),(a-8f)/6f);
+        if(a<22f)return lerp(Color.rgb(255,166,0),black,(a-14f)/8f);
+        if(a<25f)return black; // ince dis kontur
+        if(a<39f)return Color.rgb(246,116,0);
+        if(a<54f)return lerp(Color.rgb(246,116,0),Color.rgb(255,231,0),(a-39f)/15f);
+        if(a<69f)return lerp(Color.rgb(255,231,0),Color.rgb(245,19,18),(a-54f)/15f);
+        return Color.rgb(245,19,18); // guclu POZITIF cekirdek
     }
 
     public static int recommendedAlpha(int palette){ return 255; }
