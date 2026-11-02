@@ -1,23 +1,6 @@
-KTD v3.9.63 KISMI GUNCELLEME
+KTD 3D ANALYZER v3.9.65 / Uzatilmis 3D ve 4D Z eksenleri
 
-BU PAKET YALNIZCA v3.9.62'YE GORE DEGISEN 7 JAVA DOSYASINI VE 1 KILAVUZU ICERIR.
-
-ONEMLI: GitHub sayfasina ZIP dosyasini yuklemek, icindeki dosyalari kendi kendine acmaz.
-Repo koku yerine her dosyayi ZIP icindeki AYNI KLASORE yerlestir.
-
-GitHub deposunda su klasore git:
-app/src/main/java/com/ktd/analyzer/
-Buraya Prefs.java yukle/eskisiyle degistir.
-
-Ardindan bu alt klasore git:
-app/src/main/java/com/ktd/analyzer/view/
-Buraya su 6 dosyayi yukle/eskileriyle degistir:
-ColorMaps.java
-IsoSurfaceView.java
-PaletteStripView.java
-ProSurfaceGLView.java
-Surface3DView.java
-Volume4DView.java
-
-GitHub Actions > Run workflow ile APK derle.
-Bu paket tek basina Android projesi degildir, var olan v3.9.62 kaynaklarinin UZERINE uygulanir.
+Bu paket v3.9.64 uzerine uygulanir. ZIP icindeki AxisOverlayView.java dosyasini ayni klasore yukleyin.
+Z ekseni gorsel olarak 3D icin %32, 4D icin %34 uzatildi; 4D hacim kutusu ayni ortak olcegi kullanir. Z metre etiketleri arasindaki mesafe acildi. X/Y etiketleri daha seyrek gosterilir. Tam sayilar 3, 5, 10 biciminde yazilir.
+Derinlik hesaplamasi, ham sensor degerleri, Bluetooth, 2D ve renk paleti degismedi.
+APK derlemesi ve telefon testi burada yapilmadi.
