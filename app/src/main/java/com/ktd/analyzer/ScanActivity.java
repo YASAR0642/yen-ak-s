@@ -139,6 +139,7 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
             mapButton.setText(smoothMap?"HARİTA: YUMUŞAK":"HARİTA: KARELER");});
         mapModes.addView(mapButton,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,36)));
         root.addView(mapModes,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,38)));
+        Button analyze=Ui.button(this,"ANALİZ ET",true); analyze.setOnClickListener(v->{ScanSessionStore.current=data;startActivity(new Intent(this,AutoAnalysisActivity.class));});root.addView(analyze,new LinearLayout.LayoutParams(-1,Ui.dp(this,42)));
 
         FrameLayout host=new FrameLayout(this);
         gridView=new ScanGridContourView(this);gridView.setData(data);gridView.setPalette(palette);gridView.setTraversal(Prefs.startCorner(this),Prefs.serpentine(this));setActiveCell();

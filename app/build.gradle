@@ -8,8 +8,8 @@ android {
         applicationId 'com.ktd.analyzer'
         minSdk 23
         targetSdk 35
-        versionCode 3969
-        versionName '3.9.69-gmr-anomali-metre'
+        versionCode 3970
+        versionName '3.9.70-kilavuz-analiz' 
     }
 
     buildTypes {

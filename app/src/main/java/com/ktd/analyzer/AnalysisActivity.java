@@ -112,7 +112,9 @@ public final class AnalysisActivity extends Activity {
             if(surface!=null)showSurface();});
         modes.addView(mode3Button,Ui.weight(1f));modes.addView(mode4Button,Ui.weight(1f));
         modes.addView(settingsButton,Ui.weight(.95f));modes.addView(resetView,Ui.weight(.85f));
+        Button autoReport=Ui.button(this,"ANALİZ ET",true);autoReport.setOnClickListener(v->{ScanSessionStore.current=data;startActivity(new Intent(this,AutoAnalysisActivity.class));});
         root.addView(modes,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,52)));
+        root.addView(autoReport,new LinearLayout.LayoutParams(-1,Ui.dp(this,42)));
         depthHeadline=null;depthDetail=null;
 
         host=new FrameLayout(this);root.addView(host,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,0,1));

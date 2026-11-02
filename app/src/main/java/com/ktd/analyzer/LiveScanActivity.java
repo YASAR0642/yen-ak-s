@@ -119,15 +119,8 @@ public final class LiveScanActivity extends Activity implements BluetoothClient.
         FrameLayout.LayoutParams blp = new FrameLayout.LayoutParams(Ui.dp(this,54),Ui.dp(this,42),Gravity.END|Gravity.CENTER_VERTICAL);
         top.addView(back,blp);
         root.addView(top,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,56)));
-        LinearLayout perfRow=new LinearLayout(this);perfRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        Button perfButton=Ui.button(this,"TEST",false);
-        perfRow.addView(perfButton,new LinearLayout.LayoutParams(Ui.dp(this,66),Ui.dp(this,34)));
         performanceText=Ui.text(this,"",10,Color.rgb(178,243,255));
         performanceText.setVisibility(android.view.View.GONE);
-        perfRow.addView(performanceText,new LinearLayout.LayoutParams(0,Ui.dp(this,34),1));
-        perfButton.setOnClickListener(v->perfMonitor.toggle(performanceText));
-        root.addView(perfRow,new LinearLayout.LayoutParams(-1,Ui.dp(this,35)));
-
 
         connectionBox = Ui.text(this,"Bluetooth bağlı değil",13,Color.WHITE);
         connectionBox.setGravity(Gravity.CENTER);

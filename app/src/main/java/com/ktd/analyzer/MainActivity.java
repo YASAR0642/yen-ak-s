@@ -177,16 +177,16 @@ public final class MainActivity extends Activity implements BluetoothClient.List
         grid.setRowCount(cols == 1 ? 4 : 2);
 
         addMenuCard(grid, R.drawable.menu_ground,
-                "3D ZEMİN TARAMA", "Grid + kontur • 3D / 4D analiz",
+                "3D ZEMİN TARAMA", "",
                 Color.rgb(25, 222, 235), ScanActivity.class);
         addMenuCard(grid, R.drawable.menu_live,
-                "3D CANLI TARAMA", "Gerçek zamanlı renkli tarama",
+                "3D CANLI TARAMA", "",
                 Color.rgb(38, 133, 255), LiveScanActivity.class);
         addMenuCard(grid, R.drawable.menu_records,
-                "KAYITLAR", "PNG / CSV tarama arşivi",
+                "KAYITLAR", "",
                 Color.rgb(255, 190, 38), RecordsActivity.class);
         addMenuCard(grid, R.drawable.menu_settings,
-                "AYARLAR", "Görünüm • Izgara • Ses",
+                "AYARLAR", "",
                 Color.rgb(92, 218, 255), SettingsActivity.class);
 
         Button gpr=Ui.button(this,"CANLI GPR  •  Bluetooth radargram",true);
@@ -195,12 +195,6 @@ public final class MainActivity extends Activity implements BluetoothClient.List
         gprLp.setMargins(Ui.dp(this,6),0,Ui.dp(this,6),Ui.dp(this,6));
         gpr.setOnClickListener(v->startActivity(new Intent(this,LiveGprActivity.class)));
         root.addView(gpr,gprLp);
-        Button contacts=Ui.button(this,"KTD KİŞİLERİ  •  WhatsApp görüşme",false);
-        LinearLayout.LayoutParams contactsLp=new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,48));
-        contactsLp.setMargins(Ui.dp(this,6),0,Ui.dp(this,6),Ui.dp(this,6));
-        contacts.setOnClickListener(v->startActivity(new Intent(this,ContactsActivity.class)));
-        root.addView(contacts,contactsLp);
         root.addView(grid, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1));
         setContentView(root);

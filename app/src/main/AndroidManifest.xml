@@ -75,6 +75,8 @@
         </activity>
 
         <activity android:name=".ContactsActivity" android:screenOrientation="unspecified"/>
+        <activity android:name=".UserGuideActivity" android:screenOrientation="unspecified"/>
+        <activity android:name=".AutoAnalysisActivity" android:screenOrientation="unspecified"/>
         <activity android:name=".SettingsActivity" android:screenOrientation="unspecified"/>
         <activity android:name=".RecordsActivity" android:screenOrientation="unspecified"/>
         <activity android:name=".LiveGprActivity" android:screenOrientation="sensorLandscape"/>
