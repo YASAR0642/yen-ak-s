@@ -58,7 +58,6 @@ public final class AutoAnalysisActivity extends Activity {
    line(content,metal+"%",28);
    if(Double.isFinite(positiveZ))line(content,"Metal yönlü anomali Z derinliği: "+fmt(800.0/positiveZ)+" m",17);
    else line(content,"Metal yönlü anomali bulunmadı.",17);
-   line(content,"Not: Yüzdeler manyetik sinyal şiddetinden oluşturulan deneysel puanlardır; gerçek boşluk/metal bulunma ihtimali olarak doğrulanmamıştır. Derinlikler 800/Z proje hesabıdır.",12);
   }
   scroll.addView(content);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
   setContentView(root);Ui.applySafeInsets(this,root);

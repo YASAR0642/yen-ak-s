@@ -151,7 +151,7 @@ public final class Volume4DView extends GLSurfaceView {
                 float t=n==1?0f:li/(float)(n-1);
                 float level=threshold+(.86f-threshold)*t;
                 // Dış kütle saydam; merkez yoğun ve opak. Güçlü anomali içeride görünür.
-                float a=n==1?1f:(li==n-1?1f:(.42f+.18f*t));
+                float a=1f; // Tam dolu anomali yüzeyleri: dış katmanları da opak çiz.
                 if(posMax>10.5f)out.add(buildIso(dense,d,true,posMax,level,a));
                 if(negMax>10.5f)out.add(buildIso(dense,d,false,negMax,level,a));
             }

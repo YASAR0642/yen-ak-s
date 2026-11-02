@@ -136,16 +136,11 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
         addTopAction(topActions,"Yeni Tarama",false,v->resetScan());
         addTopAction(topActions,"3D / 4D",false,v->{ScanSessionStore.current=data;startActivity(new Intent(this,AnalysisActivity.class));});
         root.addView(topActions,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,58)));
-        LinearLayout mapModes=new LinearLayout(this);mapModes.setGravity(Gravity.CENTER_VERTICAL);
-        Button mapButton=Ui.button(this,"HARİTA: YUMUŞAK",false);
-        mapButton.setOnClickListener(v->{smoothMap=!smoothMap;gridView.setSmoothMap(smoothMap);
-            mapButton.setText(smoothMap?"HARİTA: YUMUŞAK":"HARİTA: KARELER");});
-        mapModes.addView(mapButton,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,36)));
-        root.addView(mapModes,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,38)));
-        Button analyze=Ui.button(this,"ANALİZ ET",true); analyze.setOnClickListener(v->{ScanSessionStore.current=data;startActivity(new Intent(this,AutoAnalysisActivity.class));});root.addView(analyze,new LinearLayout.LayoutParams(-1,Ui.dp(this,42)));
+        // 2D yalnız yumuşak harita: kare görünüm düğmesi ve 2D ANALİZ ET kaldırıldı.
+        smoothMap=true;
 
         FrameLayout host=new FrameLayout(this);
-        gridView=new ScanGridContourView(this);gridView.setData(data);gridView.setPalette(palette);gridView.setTraversal(Prefs.startCorner(this),Prefs.serpentine(this));setActiveCell();
+        gridView=new ScanGridContourView(this);gridView.setSmoothMap(true);gridView.setData(data);gridView.setPalette(palette);gridView.setTraversal(Prefs.startCorner(this),Prefs.serpentine(this));setActiveCell();
         host.addView(gridView,new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT,FrameLayout.LayoutParams.MATCH_PARENT));
         root.addView(host,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,0,1));
 

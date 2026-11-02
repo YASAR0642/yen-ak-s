@@ -54,7 +54,7 @@ public final class AxisOverlayView extends View {
         // Uzun derinliklerde eksen fiziksel metreyi sıkıştırarak ekrana sığdırır.
         // Etiketler gerçek metre olarak kalır.
         float raw=(float)(0.82f+0.55f*Math.log10(1f+m));
-        return Math.max(1.18f,Math.min(2.78f,raw*1.32f));
+        return Math.max(1.18f,Math.min(3.30f,raw*1.58f));
     }
 
     /**
@@ -68,7 +68,7 @@ public final class AxisOverlayView extends View {
         if(depth<=0f)return .62f;
         // 25-30 m gibi büyük derinliklerde de hacim kutusu ekrana sığsın.
         float raw=(float)(0.52f+0.48f*Math.log10(1f+depth));
-        return Math.max(.82f,Math.min(2.08f,raw*1.34f));
+        return Math.max(.82f,Math.min(2.60f,raw*1.60f));
     }
 
     public static float cameraDistanceFor(ScanData d,boolean volume){
@@ -206,7 +206,7 @@ public final class AxisOverlayView extends View {
             float t=i/4f,x=a[0]+dx*t,y=a[1]+dy*t,tick=dp(4.0f);
             c.drawLine(x-nx*tick,y-ny*tick,x+nx*tick,y+ny*tick,p);
             float v=-m+2f*m*t;
-            c.drawText(String.format(Locale.US,"%.0f",v),x-nx*dp(12f),y-ny*dp(12f)+sp(3f),p);
+            c.drawText(String.format(Locale.US,"%.0f",v),x+nx*dp(22f),y+ny*dp(22f)+sp(3f),p);
         }
         p.setStyle(Paint.Style.FILL);p.setTextSize(sp(12.5f));p.setFakeBoldText(true);p.setTextAlign(Paint.Align.CENTER);
         p.setColor(color);p.setAlpha(255);c.drawText("Δ",b[0]+ux*dp(12f),b[1]+uy*dp(12f)+sp(4f),p);p.setFakeBoldText(false);
@@ -226,7 +226,7 @@ public final class AxisOverlayView extends View {
         for(int i=1;i<=4;i++){
             float t=i/4f,x=a[0]+dx*t,y=a[1]+dy*t,tick=dp(4f);
             c.drawLine(x-nx*tick,y-ny*tick,x+nx*tick,y+ny*tick,p);
-            c.drawText((i*25)+"%",x-nx*dp(14f),y-ny*dp(14f)+sp(3f),p);
+            c.drawText((i*25)+"%",x+nx*dp(22f),y+ny*dp(22f)+sp(3f),p);
         }
         p.setStyle(Paint.Style.FILL);p.setTextSize(sp(12.5f));p.setFakeBoldText(true);p.setTextAlign(Paint.Align.CENTER);
         p.setColor(color);p.setAlpha(255);c.drawText("Z",b[0]+ux*dp(12f),b[1]+uy*dp(12f)+sp(4f),p);p.setFakeBoldText(false);
@@ -243,7 +243,7 @@ public final class AxisOverlayView extends View {
             for(float d=step;d<=maxDepth+1e-4f;d+=step){
                 float t=Math.min(1f,d/maxDepth),x=a[0]+dx*t,y=a[1]+dy*t,tick=dp(4.5f);
                 c.drawLine(x-nx*tick,y-ny*tick,x+nx*tick,y+ny*tick,p);
-                c.drawText(fmtDepth(d),x-nx*dp(12f),y-ny*dp(12f)+sp(3f),p);
+                c.drawText(fmtDepth(d),x+nx*dp(22f),y+ny*dp(22f)+sp(3f),p);
             }
         }
         p.setStyle(Paint.Style.FILL);p.setTextSize(sp(12.5f));p.setFakeBoldText(true);p.setTextAlign(Paint.Align.CENTER);p.setColor(color);p.setAlpha(255);c.drawText("Z",b[0]+ux*dp(12f),b[1]+uy*dp(12f)+sp(4f),p);p.setFakeBoldText(false);

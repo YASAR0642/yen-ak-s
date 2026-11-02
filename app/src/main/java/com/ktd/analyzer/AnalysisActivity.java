@@ -69,6 +69,7 @@ public final class AnalysisActivity extends Activity {
     private float depthSliceMeters=0f;
     private float volumeLevel=.35f;
     private boolean showing4D=false;
+    private Button autoReport;
     private AxisOverlayView currentAxes;
 
     @Override protected void onCreate(Bundle b){
@@ -112,9 +113,10 @@ public final class AnalysisActivity extends Activity {
             if(surface!=null)showSurface();});
         modes.addView(mode3Button,Ui.weight(1f));modes.addView(mode4Button,Ui.weight(1f));
         modes.addView(settingsButton,Ui.weight(.95f));modes.addView(resetView,Ui.weight(.85f));
-        Button autoReport=Ui.button(this,"ANALİZ ET",true);autoReport.setOnClickListener(v->{ScanSessionStore.current=data;startActivity(new Intent(this,AutoAnalysisActivity.class));});
+        autoReport=Ui.button(this,"ANALİZ ET",true);autoReport.setOnClickListener(v->{ScanSessionStore.current=data;startActivity(new Intent(this,AutoAnalysisActivity.class));});
         root.addView(modes,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,52)));
         root.addView(autoReport,new LinearLayout.LayoutParams(-1,Ui.dp(this,42)));
+        autoReport.setVisibility(View.GONE);
         depthHeadline=null;depthDetail=null;
 
         host=new FrameLayout(this);root.addView(host,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,0,1));
@@ -291,6 +293,7 @@ public final class AnalysisActivity extends Activity {
     private void showSurface(){
         if(surface!=null)surface.onPause();if(volume4d!=null)volume4d.onPause();
         showing4D=false;
+        if(autoReport!=null)autoReport.setVisibility(View.GONE);
         visualData=ReferenceInverseDepth.createRelativeIndexVolume(data);
         host.removeAllViews();surface=new ProSurfaceGLView(this);surface.setData(visualData);surface.setPalette(palette);surface.setSmoothing(Prefs.smoothing(this));surface.setWireframe(Prefs.grid(this));surface.setDisplayGain(anomalyGain);
         surface.setMode(ProSurfaceGLView.ADVANCED);surface.setDepthSliceMeters(depthSliceMeters);
@@ -308,6 +311,7 @@ public final class AnalysisActivity extends Activity {
         }
         if(surface!=null)surface.onPause();if(volume4d!=null)volume4d.onPause();
         showing4D=true;
+        if(autoReport!=null)autoReport.setVisibility(View.VISIBLE);
         visualData=ReferenceInverseDepth.createRelativeIndexVolume(data);
         host.removeAllViews();volume4d=new Volume4DView(this);volume4d.setData(visualData);volume4d.setPalette(palette);
         volume4d.setSmoothing(Prefs.smoothing(this));volume4d.setWireframe(Prefs.grid(this));

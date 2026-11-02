@@ -1,0 +1,4 @@
+KTD 3D ANALYZER v3.9.74
+Yalnız görsel düzen: Analiz Et yalnız 4D, rapor Not satırı kaldırıldı, 2D sürekli yumuşak, derinlik Z cetveli uzatıldı ve etiketleri dış tarafa taşındı, 4D anomali izoyüzeyleri tam opak. Bluetooth / sensor / veri ve hesap kodlarına dokunulmadı.
+ZIP içeriğini GitHub deposunun kök dizinine klasör yapısını koruyarak yükleyin.
+Tam APK derleme ve gerçek cihaz testi yapılamadı.
