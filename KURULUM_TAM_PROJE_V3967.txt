@@ -1,0 +1,20 @@
+KTD 3D ANALYZER v3.9.67 — TAM GITHUB ANDROID PROJESI
+
+Bu paket v3.9.63 ana projeye v3.9.64 -> 3.9.65 -> 3.9.66 -> 3.9.67 Java yamalari sirayla uygulanarak olusturulmustur.
+
+Android: app/ altinda tum Java siniflari ve Android kaynaklari.
+GitHub Actions: .github/workflows/main.yml
+Gradle: build.gradle, settings.gradle, gradle.properties
+ESP32 V11: firmware/KTD_EMS100_V11_POLARITE_SENSPRO/KTD_EMS100_V11_POLARITE_SENSPRO.ino
+
+GITHUB 100 DOSYA SINIRI:
+GitHub web arayuzu 100 dosyadan fazla dosyayi tek seferde kabul etmeyebilir.
+Bu tam dosyayi web arayuzune surukleyip birakmak yerine GitHub Desktop
+veya git push kullanin. Web uzerinden devam edecekseniz dosyalari
+2 veya daha fazla grup halinde ve klasor yollarini koruyarak yukleyin.
+
+GitHub Actions -> KTD ... -> Run workflow -> Artifacts altinda APK.
+
+Lutfen onceki uygulama kayitlarinizi yedekleyin.
+Tam APK ve ESP32 gercek donanim derlemesi burada dogrulanmamistir.
+Sinyal polaritesi malzeme turunun bilimsel kaniti degildir.

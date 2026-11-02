@@ -81,7 +81,7 @@ public final class AnalysisActivity extends Activity {
             data.serpentine=Prefs.serpentine(this);
         }
         palette=Prefs.palette(this);
-        anomalyGain=Prefs.anomalyGain(this);
+        anomalyGain=3.0f;
         volumeSpread=Prefs.volumeSpread(this);
         volumeLayers=Prefs.volumeLayers(this);
         volumeLevel=Prefs.volumeThreshold(this);
@@ -121,7 +121,8 @@ public final class AnalysisActivity extends Activity {
         // Kullanıcı seçilen metre seviyesinde 3D/4D görseli aşağı-yukarı gezdirir.
         levelControls=buildLevelControls();
         root.addView(levelControls,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,56)));
-        root.addView(buildGainControls(),new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,45)));
+        // Kazanç en yüksek görünümde sabit; ayrı satır kaldırıldı.
+        setGain(3.0f);
 
         isoControls=buildIsoControls();isoControls.setVisibility(View.GONE);
         root.addView(isoControls,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,116)));
@@ -131,7 +132,7 @@ public final class AnalysisActivity extends Activity {
         ps.addView(palettes,new HorizontalScrollView.LayoutParams(Ui.dp(this,ColorMaps.COUNT*92),Ui.dp(this,52)));root.addView(ps,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,54)));
 
         LinearLayout actions=new LinearLayout(this);actions.setGravity(Gravity.CENTER);
-        addBottom(actions,"CSV / V3D Aç",v->openCsv());addBottom(actions,"CSV Kaydet",v->saveCsv());addBottom(actions,"PAYLAŞ",v->shareDialog());
+        // CSV/V3D açma ve CSV kayıt butonları görüntüleme ekranından kaldırıldı.addBottom(actions,"PAYLAŞ",v->shareDialog());
         root.addView(actions,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,62)));
 
         setContentView(root);Ui.applySafeInsets(this,root);updateDepthLabel();refreshNeutralInfo();refreshDepthDisplay();
@@ -170,15 +171,13 @@ public final class AnalysisActivity extends Activity {
         boolean modelReady=hasModelDepth();
         if(levelSeek!=null)levelSeek.setEnabled(available);
         if(levelLabel==null)return;
-        if(visualData!=null && visualData.rulerDerivedDepth){
-            levelLabel.setText("C=800/Z • indeks (metre değil)");return;
-        }
+        
         if(!available&&!modelReady){
             levelLabel.setText("Z: göreli hacim (derinlik yok)");return;
         }
-        if(depthSliceMeters<=0f){levelLabel.setText(available?"≈ Derinlik: Tümü":"Model: Tümü");return;}
+        if(depthSliceMeters<=0f){levelLabel.setText(available?"Derinlik: Tümü":"Derinlik: Tümü");return;}
         levelLabel.setText(String.format(Locale.forLanguageTag("tr-TR"),
-            available?"≈ %.2f m":"Ön model: %.2f m",depthSliceMeters));
+            available?"%.2f m":"%.2f m",depthSliceMeters));
     }
 
     private boolean hasModelDepth(){
@@ -227,10 +226,7 @@ public final class AnalysisActivity extends Activity {
         CheckBox smooth=new CheckBox(this);smooth.setText("3D ve 4D yumuşatma");smooth.setTextColor(Color.WHITE);smooth.setChecked(Prefs.smoothing(this));
         CheckBox grid=new CheckBox(this);grid.setText("3D ızgara / 4D çerçeve");grid.setTextColor(Color.WHITE);grid.setChecked(Prefs.grid(this));
         panel.addView(smooth);panel.addView(grid);
-        TextView gainTitle=Ui.text(this,String.format(Locale.US,"Kazanç: %.1fx",anomalyGain),13,Color.WHITE);
-        SeekBar gain=new SeekBar(this);gain.setMax(28);gain.setProgress(Math.round((anomalyGain-.2f)*10f));
-        gain.setOnSeekBarChangeListener(simple(v->gainTitle.setText(String.format(Locale.US,"Kazanç: %.1fx",.2f+v*.1f))));
-        panel.addView(gainTitle);panel.addView(gain);
+
         TextView opacityTitle=Ui.text(this,String.format(Locale.US,"Doğal zemin görünürlüğü: %d",Math.round(Prefs.groundOpacity(this)*100)),13,Color.WHITE);
         SeekBar opacitySeek=new SeekBar(this);opacitySeek.setMax(33);opacitySeek.setProgress(Math.round((Prefs.groundOpacity(this)-.02f)*100f));
         opacitySeek.setOnSeekBarChangeListener(simple(v->opacityTitle.setText("Doğal zemin görünürlüğü: %"+(v+2))));
@@ -249,7 +245,7 @@ public final class AnalysisActivity extends Activity {
             .setView(scroll).setPositiveButton("Uygula",(d,w)->{
                 Prefs.setView(this,Prefs.heightGain(this),smooth.isChecked(),grid.isChecked());
                 Prefs.setVolumeVisuals(this,.02f+opacitySeek.getProgress()/100f,.70f+sharpSeek.getProgress()/10f);
-                setGain(.2f+gain.getProgress()*.1f);gainSeek.setProgress(gain.getProgress());
+                setGain(3.0f);
                 volumeLayers=layers.getProgress()+1;
                 Prefs.setVolume(this,volumeLayers,volumeSpread,volumeLevel);
                 if(showing4D)show4D();else showSurface();
@@ -313,7 +309,7 @@ public final class AnalysisActivity extends Activity {
         visualData=ReferenceInverseDepth.createRelativeIndexVolume(data);
         host.removeAllViews();volume4d=new Volume4DView(this);volume4d.setData(visualData);volume4d.setPalette(palette);
         volume4d.setSmoothing(Prefs.smoothing(this));volume4d.setWireframe(Prefs.grid(this));
-        volume4d.setThreshold(Math.max(.06f,volumeLevel/anomalyGain));volume4d.setDepthFocusMeters(depthSliceMeters);
+        volume4d.setThreshold(Math.max(.035f,Math.min(.20f,volumeLevel/anomalyGain)));volume4d.setDepthFocusMeters(depthSliceMeters);
         volume4d.setSpread(volumeSpread);volume4d.setLayers(volumeLayers);
         volume4d.setOpacity(Prefs.groundOpacity(this));volume4d.setSharpness(Prefs.anomalySharpness(this));
         host.addView(volume4d,new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT,FrameLayout.LayoutParams.MATCH_PARENT));
@@ -500,7 +496,7 @@ public final class AnalysisActivity extends Activity {
     private void refreshNeutralInfo(){
         if(neutralInfo==null||data==null)return;
         String text;
-        if(data.cIsDerivedFromRaw)text="C = "+data.derivedCDivisor+"/Z turevi • gercek derinlik degil • 3D anomali";
+        if(data.cIsDerivedFromRaw)text="Z derinlik ekseni • 3D anomali";
         else if(data.hasDepthData())text="C kanalı mevcut • fiziksel doğruluk teyit edilmeli";
         else text="HAM ANOMALİ • model metreleri doğrulanmamış";
         int verified=data.fieldVerifiedCount();

@@ -28,23 +28,10 @@ public final class CellDepthDisplay {
         if(d==null||row<0||row>=d.rows||col<0||col>=d.cols||!d.filled[row][col])return UNKNOWN;
         float site=d.fieldVerifiedDepth[row][col];
         if(Float.isFinite(site)&&site>=0)return new Value(Source.VERIFIED,site);
-        // Kullanıcı Z ham sensörünün ilk ortam referansına göre ters ölçeğini istiyor.
-        // Gerçekten saha tarafından doğrulanmış nokta bunun üstünde tutulur.
-        ReferenceInverseDepth.Reading reading=ReferenceInverseDepth.at(d,row,col);
-        if(Float.isFinite(reading.meters))return new Value(Source.RULER,reading.meters);
-        // Referans bulunamazsa yalnız bağımsız cihaz C alanını gösterebiliriz.
-        if(!d.cIsDerivedFromRaw){
-            float c=d.depth[row][col];
-            if(Float.isFinite(c)&&c>=0)return new Value(Source.DEVICE_C,c);
-        }
-        if(fit==null||!fit.hasEstimate()||!Double.isFinite(fit.depthMeters)||fit.depthMeters<=0)return UNKNOWN;
-        // Dipol derinliği tek bir hedefin parametresidir. Bütün hücrelere yaymak yanlış olur.
-        double x=Float.isFinite(d.x[row][col])?d.x[row][col]:(d.rows-1-row)*d.stepCm/100.0;
-        double y=Float.isFinite(d.y[row][col])?d.y[row][col]:col*d.stepCm/100.0;
-        double radius=Math.max(.20,d.stepCm/100.0*.95);
-        double dx=x-fit.xMeters,dy=y-fit.yMeters;
-        if(dx*dx+dy*dy>radius*radius)return UNKNOWN;
-        if(Math.abs(d.delta[row][col])<Math.max(10f,d.maxAbs()*.16f))return UNKNOWN;
-        return new Value(Source.MODEL,(float)fit.depthMeters);
+        // Ortak KTD proje dönüşümü: 2D = 3D = 4D, 800 / ham Z.
+        // Ölçek, bilinen derinliklerde saha kalibrasyonu yapılana kadar proje değeridir.
+        float calculated=InverseSignalIndex.fromRaw(d.raw[row][col]);
+        if(Float.isFinite(calculated))return new Value(Source.DEVICE_C,calculated);
+        return UNKNOWN;
     }
 }

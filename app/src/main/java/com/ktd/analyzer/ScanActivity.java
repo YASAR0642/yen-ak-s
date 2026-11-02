@@ -126,12 +126,7 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
 
         // Kullanıcı isteği: 2D kareleri dışında açıklama satırı yok.
         depthHint=null;
-        sensProHint=new TextView(this);
-        sensProHint.setTextColor(Color.rgb(163,192,206));
-        sensProHint.setTextSize(11);
-        sensProHint.setPadding(Ui.dp(this,6),0,0,0);
-        sensProHint.setText("Sens Pro: cihazdan ADC10 verisi bekleniyor");
-        root.addView(sensProHint,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,24)));
+        sensProHint=null; // Nano ADC10 test paneli kullanıcı arayüzünden kaldırıldı.
 
         LinearLayout topActions=new LinearLayout(this);topActions.setGravity(Gravity.CENTER_VERTICAL);topActions.setPadding(Ui.dp(this,2),Ui.dp(this,2),Ui.dp(this,2),Ui.dp(this,5));
         addTopAction(topActions,"Izgara",false,v->gridDialog());
@@ -331,10 +326,6 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
     @Override public void onFrame(SensorFrame f){runOnUiThread(()->consume(f));}
     private void consume(SensorFrame f){
         if(f==null)return;
-        if(sensProHint!=null && f.legacyAdc10>=0){
-            sensProHint.setText("Nano ADC10: "+f.legacyAdc10+"  •  Sens Pro aralık: "+
-                com.ktd.analyzer.data.SensProLegacy.label(f.legacyAdc10)+" (hedef türü değildir)");
-        }
         // onStart'taki global son-paket tekrarı referans veya örnek değildir.
         if(replayToIgnore!=null&&f==replayToIgnore){replayToIgnore=null;return;}
         replayToIgnore=null;
