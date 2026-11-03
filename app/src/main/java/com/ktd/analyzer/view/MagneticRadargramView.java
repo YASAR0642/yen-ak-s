@@ -124,6 +124,12 @@ public final class MagneticRadargramView extends View {
         // The RENK selector changes visual vibrancy, not polarity or background.
         float magnitude=(float)Math.min(1.0,Math.abs(signed));
         float vibrancy=0.90f+0.025f*(palette%5);
+        // Palette 1/11: monochrome alternating reflections, analogous to the
+        // visual style in the supplied GPR screenshots (NOT true GPR echoes).
+        if(palette==0){
+            int gray=signed>=0 ? 239 : 26;
+            return blend(GMR_GRAY,Color.rgb(gray,gray,gray),Math.min(1f,magnitude*2.15f));
+        }
         int target=signed<0 ? Color.rgb(20,92,232) : Color.rgb(240,46,35);
         int accent=signed<0 ? Color.rgb(85,204,255) : Color.rgb(255,205,50);
         if(magnitude>0.72f)target=blend(target,accent,(magnitude-0.72f)*1.0f);

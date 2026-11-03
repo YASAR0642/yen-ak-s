@@ -224,57 +224,46 @@ public final class MagneticRadarActivity extends Activity implements BluetoothCl
     // The vertical position is the project's 800/Z visualization convention,
     // NOT independently measured GPR propagation depth or a material ID.
     // No simulated hyperbolas or added target geometries.
+    // GMR pseudo-radargram: each column is generated from ONE measured magnetic
+    // gradiometer sample. The wavelet is a visual encoding, not a measured GPR echo.
+    // 800/Z is kept as the project's display axis. It is not time-of-flight depth.
     private void appendDelta(float delta, boolean store){
-        long t=perfMonitor.processBegin();
+        long processToken=perfMonitor.processBegin();
         if(store){synchronized(captured){captured.add(delta);}}
-        if(!Float.isFinite(delta)){perfMonitor.processEnd(t);return;}
-        // Signed raw sensor difference. No drift subtraction or smoothing.
-        float corrected=delta;
-        float z=512f+corrected;
-        double depthM=Math.max(0.25,Math.min(10.0,800.0/Math.max(1.0,z)));
+        if(!Float.isFinite(delta)){perfMonitor.processEnd(processToken);return;}
         final int size=256;
         final short[] section=new short[size];
-        double magnitude=Math.abs(corrected);
-        if(magnitude>=15.0){
-            // The current raw signed deviation determines the disturbance.
-            // Negative (void-direction) extends UP from its depth;
-            // positive (metal-direction) extends DOWN. No synthetic hyperbola.
-            // A fixed strength-dependent length is stored in the trace,
-            // so older observations never fade or change shape.
-            final double center=depthM/10.0*(size-1);
-            final double excess=magnitude-15.0;
-            // Compact GPR-like, *not* a fabricated full-depth hyperbola or spike.
-            // The upper and lower anomaly bounds are in actual draw-array order:
-            // index 0 = surface, 255 = 10 m (Android screen Y grows DOWN).
-            final double length=10.0+Math.min(29.0,excess*0.47);
-            final double edgeWidth=3.2+Math.min(2.2,excess/55.0);
-            final double amplitude=Math.min(26000.0,13500.0+excess*175.0);
-            final boolean isVoidDirection=corrected<0;
-            for(int i=0;i<size;i++){
-                final double distance=isVoidDirection ? center-i : i-center;
-                // Negative signal: up towards the surface. Positive: down to deeper rows.
-                // Values outside this directional segment stay exactly zero/gray.
-                if(distance < -edgeWidth || distance > length+edgeWidth)continue;
-                double profile;
-                if(distance<0){
-                    double edgeFactor=(distance+edgeWidth)/edgeWidth;
-                    profile=edgeFactor*edgeFactor*(3.0-2.0*edgeFactor);
-                }else if(distance<=length){
-                    // Medium-width, multiple closely spaced contrasting layers.
-                    double shapeFactor=distance/length;
-                    profile=(1.0-0.70*shapeFactor) * (0.84+0.16*Math.cos(Math.PI*shapeFactor*3.0));
-                }else{
-                    double endFactor=(length+edgeWidth-distance)/edgeWidth;
-                    profile=0.30*Math.max(0.0,endFactor*endFactor*(3.0-2.0*endFactor));
-                }
-                final double signedAmplitude=(isVoidDirection?-1.0:1.0)*amplitude*profile;
-                section[i]=(short)Math.round(signedAmplitude);
+        final float signedRaw=delta;
+        final double magnitude=Math.abs(signedRaw);
+        final double threshold=15.0;
+        if(magnitude>=threshold){
+            final double sensorZ=512.0+signedRaw;
+            final double projectDepth=Math.max(0.25,Math.min(10.0,800.0/Math.max(1.0,sensorZ)));
+            final double center=projectDepth*(size-1)/10.0;
+            // Width represents visual anomaly intensity, not measured target height.
+            // Multi-lobed Ricker response adds GPR-like alternating dark/light bands
+            // without fabricating independent subsoil depth samples or parabolas.
+            final double strength=Math.min(1.0,(magnitude-threshold)/95.0);
+            final double sigma=3.8+6.2*strength;
+            final double amplitude=Math.min(23500.0,9500.0+(magnitude-threshold)*125.0);
+            final double polarity=signedRaw<0?-1.0:1.0;
+            for(int y=0;y<size;y++){
+                double u=(y-center)/sigma;
+                if(Math.abs(u)>6.0)continue;
+                double primary=(1.0-u*u)*Math.exp(-0.5*u*u);
+                double secondary=0.32*(1.0-(u-2.65)*(u-2.65))
+                        *Math.exp(-0.5*(u-2.65)*(u-2.65));
+                double tertiary=0.19*(1.0-(u+2.7)*(u+2.7))
+                        *Math.exp(-0.5*(u+2.7)*(u+2.7));
+                double reflection=primary+secondary+tertiary;
+                double sample=polarity*amplitude*reflection;
+                section[y]=(short)Math.max(-30000,Math.min(30000,Math.round(sample)));
             }
         }
         radar.add(new GprProtocol.Trace(sequence++,section));
         radar.setSurveyPositionCm(0);
         panels.invalidate();
-        perfMonitor.processEnd(t);
+        perfMonitor.processEnd(processToken);
     }
     private void preview(){
         radar.setWindowTraces(180);radar.clear();radar.setSurveyPositionCm(0);sequence=0;resetDetection();

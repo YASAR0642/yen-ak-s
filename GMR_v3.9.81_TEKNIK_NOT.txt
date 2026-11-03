@@ -1,0 +1,26 @@
+KTD GMR 3.9.81 — dalga profili görüntüleme denemesi
+
+Değiştirilen kaynaklar:
+  app/src/main/java/com/ktd/analyzer/MagneticRadarActivity.java
+  app/src/main/java/com/ktd/analyzer/view/MagneticRadargramView.java
+  app/build.gradle (sürüm)
+
+- Her BT ölçümü için bir yeni radargram kolonu.
+- İlk kolon solda; sonra sağa dolar; dolunca eskiler soldan çıkar.
+- Kayıtlı veri solmaz; sabit kontrast.
+- ±15 eşik ve ham referans farkı korunur.
+- Z işaretine bağlı üç loblu Ricker dalga profili: daha belirgin siyah/beyaz bantlar.
+- Palet 1/11 gri tonlu; diğer renk modları korunur.
+- 0–10 metre görsel cetvel korunur, 800/Z konum haritalaması kullanılır.
+- ESP32 kodu ve 2D/3D/4D değiştirilmedi.
+
+FİZİKSEL SINIR: EMS100 yalnız manyetik alan verir, gerçek GPR zaman/
+derinlik izi vermez. Dalga profili yalnız GPR benzeri temsili gösterimdir.
+800/Z formülü güçlü pozitif Z için daha küçük sayısal derinlik üretir.
+Bu tersliği tek sensör ölçümünden fiziksel olarak düzeltecek veri yoktur.
+
+Tork ZIP: yalnız EXE + RIMEGPR.CFG içeriyor, kaynak kodu yok;
+exe çalıştırılmadı. CFG 75/150 ns ölçüm penceresi gibi gerçek GPR
+parametreleri içeriyor; manyetik veriyle doğrudan uyumlu değil.
+
+Arşiv ve kaynak statik kontrol yapılmıştır; gerçek APK derlenmedi.
