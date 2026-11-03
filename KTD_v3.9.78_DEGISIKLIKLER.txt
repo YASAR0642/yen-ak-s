@@ -1,0 +1,10 @@
+GMR 3.9.78 - Yalnız çizim sistemi güncellemesi
+- İlk radargram verisi soldan başlar ve sağa doğru doldurur.
+- Ekran dolunca yeni veri sağdan eklenir, en eski veri soldan çıkar.
+- Metal yönlü (+) sapma hesaplanan seviyeden aşağı; boşluk yönlü (-) sapma yukarı genişler.
+- 15 birim eşiği korunur. Görünür, orta kalınlıkta konturlar ve şiddete göre sınırlı uzama.
+- Hiperbol üretimi yok. Ölçüm verisinde filtre yok.
+- Önceki örneklere solma/fade uygulanmaz.
+- Eski paletler, mevcut ESP32 ve 2D/3D/4D kodları korunur.
+- Derinlik koordinatı 800/Z proje konvansiyonudur; bağımsız GPR derinlik ölçümü değildir.
+- APK/ESP32 derlemesi ve telefon saha testi henüz yapılmadı.

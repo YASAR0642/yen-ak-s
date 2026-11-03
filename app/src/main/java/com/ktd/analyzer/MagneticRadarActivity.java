@@ -252,15 +252,31 @@ public final class MagneticRadarActivity extends Activity implements BluetoothCl
         final short[] section=new short[size];
         double magnitude=Math.abs(corrected);
         if(magnitude>=15.0){
-            // Local disturbance, no long spike, stretching or fake hyperbola.
-            double center=depthM/10.0*(size-1);
-            double width=5.0+Math.min(4.0,(magnitude-15.0)/24.0);
-            double strength=Math.signum(corrected)*Math.min(26000.0,9000.0+(magnitude-15.0)*190.0);
+            // The current raw signed deviation determines the disturbance.
+            // Negative (void-direction) extends UP from its depth;
+            // positive (metal-direction) extends DOWN. No synthetic hyperbola.
+            // A fixed strength-dependent length is stored in the trace,
+            // so older observations never fade or change shape.
+            final double center=depthM/10.0*(size-1);
+            final double excess=magnitude-15.0;
+            final double coreRadius=3.5+Math.min(3.0,excess/22.0);
+            final double tailLength=6.0+Math.min(24.0,excess*0.32);
+            final double amplitude=Math.min(28000.0,11000.0+excess*220.0);
+            final int direction=corrected>0 ? 1 : -1; // rows grow downward
             for(int i=0;i<size;i++){
-                double distance=Math.abs(i-center);
-                if(distance<=width){
-                    double edge=0.5+0.5*Math.cos(Math.PI*distance/width);
-                    section[i]=(short)Math.round(strength*edge);
+                final double d=i-center;
+                final double abs=Math.abs(d);
+                double intensity=0.0;
+                if(abs<=coreRadius){
+                    intensity=0.65+0.35*Math.cos(Math.PI*abs/(2.0*coreRadius));
+                } else if(d*direction>0 && abs<=coreRadius+tailLength){
+                    final double progress=(abs-coreRadius)/tailLength;
+                    intensity=0.65*(1.0-progress)*(1.0-progress);
+                }
+                if(intensity>0){
+                    // Layer structure without time/position opacity decay.
+                    final double layer=0.88+0.12*Math.cos((abs/coreRadius)*Math.PI*1.7);
+                    section[i]=(short)Math.round(Math.signum(corrected)*amplitude*intensity*layer);
                 }
             }
         }

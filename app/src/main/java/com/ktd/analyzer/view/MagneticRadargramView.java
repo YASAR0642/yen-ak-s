@@ -179,9 +179,9 @@ public final class MagneticRadargramView extends View {
             p.setFilterBitmap(true);p.setStyle(Paint.Style.FILL);
             // Fixed trace pitch. Old traces leave from left after 180; no rescaling during playback.
             int drawnW=Math.max(1,Math.round(ww*(visibleN/(float)windowTraces)));
-            // Latest sample always enters from the right; old samples scroll left.
+            // Start at left; once full, new samples enter right and oldest exit left.
             // No position/time-based transparency or fading.
-            canvas.drawBitmap(bmp,new Rect(0,0,visibleN,rows),new Rect(left+ww-drawnW,top,left+ww,top+hh),p);
+            canvas.drawBitmap(bmp,new Rect(0,0,visibleN,rows),new Rect(left,top,left+drawnW,top+hh),p);
             bmp.recycle();
         }
         // Horizontal axis is the received observation index, not measured distance.
@@ -191,7 +191,7 @@ public final class MagneticRadargramView extends View {
         int firstSample=Math.max(0,traces.size()-browseOffset-visibleN);
         int stepLabels=Math.max(1,windowTraces/4);
         for(int i=0;i<visibleN;i+=stepLabels){
-            float xx=left+ww*(1f-visibleN/(float)windowTraces+i/(float)windowTraces);
+            float xx=left+ww*(i/(float)windowTraces);
             canvas.drawText(Integer.toString(firstSample+i+1),xx,top-8*dp,label);
         }
         p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(dp*.65f);p.setColor(Color.rgb(85,111,125));
