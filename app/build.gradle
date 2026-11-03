@@ -8,8 +8,8 @@ android {
         applicationId 'com.ktd.analyzer'
         minSdk 23
         targetSdk 35
-        versionCode 3978
-        versionName '3.9.78-gmr-yatay-akis' 
+        versionCode 3979
+        versionName '3.9.79-gmr-gri-yon-sabit' 
     }
 
     buildTypes {

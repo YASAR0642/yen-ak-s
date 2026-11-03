@@ -109,10 +109,25 @@ public final class MagneticRadargramView extends View {
         if(traces.size()>=MAX_TRACES)traces.removeFirst();
         traces.addLast(t);if(!browseEnabled)browseOffset=0;invalidate();
     }
+    // Neutral gray background on ALL 11 GMR palettes. Polarity is never reversed:
+    // negative sensor deviation -> BLUE (shallower/up), positive -> RED (deeper/down).
+    private static final int GMR_GRAY=Color.rgb(101,108,116);
+    private static int blend(int a,int b,float t){
+        t=Math.max(0f,Math.min(1f,t));
+        return Color.rgb(
+            Math.round(Color.red(a)*(1-t)+Color.red(b)*t),
+            Math.round(Color.green(a)*(1-t)+Color.green(b)*t),
+            Math.round(Color.blue(a)*(1-t)+Color.blue(b)*t));
+    }
     private int shade(double signed){
-        // Use the identical 3D analyzer color palettes, retaining magnitude and sign.
-        float normalized=(float)Math.max(-1.0,Math.min(1.0,signed));
-        return ColorMaps.color(palette,normalized*100f,100f);
+        if(Math.abs(signed)<0.001)return GMR_GRAY;
+        // The RENK selector changes visual vibrancy, not polarity or background.
+        float magnitude=(float)Math.min(1.0,Math.abs(signed));
+        float vibrancy=0.90f+0.025f*(palette%5);
+        int target=signed<0 ? Color.rgb(20,92,232) : Color.rgb(240,46,35);
+        int accent=signed<0 ? Color.rgb(85,204,255) : Color.rgb(255,205,50);
+        if(magnitude>0.72f)target=blend(target,accent,(magnitude-0.72f)*1.0f);
+        return blend(GMR_GRAY,target,Math.min(1f,magnitude*vibrancy*1.8f));
     }
     private float[][] processed(List<GprProtocol.Trace> items,int rowCount,int visibleSamples){
         int n=items.size();float[][] result=new float[n][rowCount];
@@ -146,7 +161,7 @@ public final class MagneticRadargramView extends View {
         float dp=getResources().getDisplayMetrics().density;
         int left=(int)(65*dp),right=(int)(57*dp),top=(int)(28*dp),bottom=(int)(8*dp);
         int ww=Math.max(1,w-left-right),hh=Math.max(1,h-top-bottom);
-        p.setStyle(Paint.Style.FILL);p.setColor(Color.BLACK);canvas.drawRect(left,top,left+ww,top+hh,p);
+        p.setStyle(Paint.Style.FILL);p.setColor(GMR_GRAY);canvas.drawRect(left,top,left+ww,top+hh,p);
         List<GprProtocol.Trace> items=snapshot();
         int visibleN=items.size();
         int visibleSamples=nSamples;
@@ -173,15 +188,19 @@ public final class MagneticRadargramView extends View {
                 // Soft clipping preserves visible detail at high manual gains.
                 response=Math.tanh(response*.83);
                 // Retain polarity and genuine relative contrast; avoid negative-side clipping.
-                pixels[y*visibleN+x]=(gain<=0.0001f||localGain<=0.0001f?Color.rgb(128,128,128):shade(response));
+                pixels[y*visibleN+x]=(gain<=0.0001f||localGain<=0.0001f?GMR_GRAY:shade(response));
             }
             Bitmap bmp=Bitmap.createBitmap(pixels,visibleN,rows,Bitmap.Config.ARGB_8888);
             p.setFilterBitmap(true);p.setStyle(Paint.Style.FILL);
             // Fixed trace pitch. Old traces leave from left after 180; no rescaling during playback.
             int drawnW=Math.max(1,Math.round(ww*(visibleN/(float)windowTraces)));
-            // Start at left; once full, new samples enter right and oldest exit left.
-            // No position/time-based transparency or fading.
-            canvas.drawBitmap(bmp,new Rect(0,0,visibleN,rows),new Rect(left,top,left+drawnW,top+hh),p);
+            // Phase 1: first observation is the LEFTMOST column and the screen
+            // fills toward RIGHT. Phase 2: when full, the oldest exits LEFT,
+            // newest remains at RIGHT. Each stored trace keeps its original color.
+            // No fading, per-frame rescaling, reversal, or horizontal mirroring.
+            p.setAlpha(255);
+            canvas.drawBitmap(bmp,new Rect(0,0,visibleN,rows),
+                    new Rect(left,top,left+drawnW,top+hh),p);
             bmp.recycle();
         }
         // Horizontal axis is the received observation index, not measured distance.

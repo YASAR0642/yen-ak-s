@@ -1,0 +1,12 @@
+KTD GMR v3.9.79
+- Yalnızca MagneticRadarActivity.java ve MagneticRadargramView.java görüntüleme motoru değiştirildi.
+- Normal sensör sinyali için gri arka plan.
+- Negatif anomali mavi; hesaplanan derinlikten YUKARI uzanır.
+- Pozitif anomali kırmızı; hesaplanan derinlikten AŞAĞI uzanır.
+- Eşik ±15 birim, verilerde yazılımsal zaman filtresi yok.
+- Soldan başlar, sağa dolar; dolunca eski veriler sol kenardan silinir.
+- Veri solana kadar renk değiştirmez; örnek pencere genişliği canlı akışta sabittir.
+- 0-10 m gösterim ölçeği, 0-25 cm yüzey alanı korunmuştur.
+- Palet seçim düğmesi ve Bluetooth/diğer ekranlar korunur.
+- 800/Z derinlik değerleri proje görselleştirmesidir, bağımsız ölçüm değildir.
+- Derlenmiş APK/test edilmiş cihaz sonucu bu paketin parçası değildir.

@@ -212,25 +212,9 @@ public final class MagneticRadarActivity extends Activity implements BluetoothCl
 
     @Override public void onFrame(SensorFrame f){
         perfMonitor.received();if(!running||fileMode||f==null)return;float v=f.signal();if(!Float.isFinite(v)||v<0||v>1023)return;
-        // Real inter-arrival interval at the Android receiver, NOT GPR ns/time-of-flight.
-        long now=SystemClock.elapsedRealtime();
-        if(lastArrivalMs>0){
-            long elapsedMs=now-lastArrivalMs;
-            if(elapsedMs>=5 && elapsedMs<=5000){
-                // Requested first experiment: convert RECEIVER inter-arrival ms to ns.
-                // 1 ms = 1,000,000 ns; not a GPR pulse travel time.
-                double elapsedNs=elapsedMs*1_000_000.0;
-                averageArrivalNs=timingSamples==0 ? elapsedNs : averageArrivalNs*.85+elapsedNs*.15;
-                timingSamples++;
-                // Faster HORIZONTAL DISPLAY ONLY: halve rolling window time (18 s -> 9 s).
-                // Never change received samples, waveform synthesis, gain or saved data.
-                // Shorter live window means each incoming trace advances farther onscreen.
-                final double windowNs=9_000_000_000.0;
-                final int capacity=Math.max(48,Math.min(90,(int)Math.round(windowNs/averageArrivalNs)));
-                runOnUiThread(()->{if(!fileMode)radar.setWindowTraces(capacity);});
-            }
-        }
-        lastArrivalMs=now;
+        // One received measurement produces one screen column.
+        // Keep a FIXED trace window: changes to Bluetooth arrival speed must not
+        // stretch previous anomalies or reverse the direction of the animation.
         final long queuedAtNs=System.nanoTime();
         runOnUiThread(()->{perfMonitor.queueWaitNs(System.nanoTime()-queuedAtNs);if(!running)return;float z=ReferenceModel.normalize(v);if(!zeroed){reference.zero(z);zeroed=true;return;}
             float delta=reference.delta(z);appendDelta(delta,true);
@@ -259,25 +243,32 @@ public final class MagneticRadarActivity extends Activity implements BluetoothCl
             // so older observations never fade or change shape.
             final double center=depthM/10.0*(size-1);
             final double excess=magnitude-15.0;
-            final double coreRadius=3.5+Math.min(3.0,excess/22.0);
-            final double tailLength=6.0+Math.min(24.0,excess*0.32);
-            final double amplitude=Math.min(28000.0,11000.0+excess*220.0);
-            final int direction=corrected>0 ? 1 : -1; // rows grow downward
+            // Compact GPR-like, *not* a fabricated full-depth hyperbola or spike.
+            // The upper and lower anomaly bounds are in actual draw-array order:
+            // index 0 = surface, 255 = 10 m (Android screen Y grows DOWN).
+            final double length=10.0+Math.min(29.0,excess*0.47);
+            final double edgeWidth=3.2+Math.min(2.2,excess/55.0);
+            final double amplitude=Math.min(26000.0,13500.0+excess*175.0);
+            final boolean isVoidDirection=corrected<0;
             for(int i=0;i<size;i++){
-                final double d=i-center;
-                final double abs=Math.abs(d);
-                double intensity=0.0;
-                if(abs<=coreRadius){
-                    intensity=0.65+0.35*Math.cos(Math.PI*abs/(2.0*coreRadius));
-                } else if(d*direction>0 && abs<=coreRadius+tailLength){
-                    final double progress=(abs-coreRadius)/tailLength;
-                    intensity=0.65*(1.0-progress)*(1.0-progress);
+                final double distance=isVoidDirection ? center-i : i-center;
+                // Negative signal: up towards the surface. Positive: down to deeper rows.
+                // Values outside this directional segment stay exactly zero/gray.
+                if(distance < -edgeWidth || distance > length+edgeWidth)continue;
+                double profile;
+                if(distance<0){
+                    double t=(distance+edgeWidth)/edgeWidth;
+                    profile=t*t*(3.0-2.0*t);
+                }else if(distance<=length){
+                    // Medium-width, multiple closely spaced contrasting layers.
+                    double t=distance/length;
+                    profile=(1.0-0.70*t) * (0.84+0.16*Math.cos(Math.PI*t*3.0));
+                }else{
+                    double t=(length+edgeWidth-distance)/edgeWidth;
+                    profile=0.30*Math.max(0.0,t*t*(3.0-2.0*t));
                 }
-                if(intensity>0){
-                    // Layer structure without time/position opacity decay.
-                    final double layer=0.88+0.12*Math.cos((abs/coreRadius)*Math.PI*1.7);
-                    section[i]=(short)Math.round(Math.signum(corrected)*amplitude*intensity*layer);
-                }
+                final double signedAmplitude=(isVoidDirection?-1.0:1.0)*amplitude*profile;
+                section[i]=(short)Math.round(signedAmplitude);
             }
         }
         radar.add(new GprProtocol.Trace(sequence++,section));
