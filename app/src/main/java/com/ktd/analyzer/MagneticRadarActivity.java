@@ -257,15 +257,15 @@ public final class MagneticRadarActivity extends Activity implements BluetoothCl
                 if(distance < -edgeWidth || distance > length+edgeWidth)continue;
                 double profile;
                 if(distance<0){
-                    double t=(distance+edgeWidth)/edgeWidth;
-                    profile=t*t*(3.0-2.0*t);
+                    double edgeFactor=(distance+edgeWidth)/edgeWidth;
+                    profile=edgeFactor*edgeFactor*(3.0-2.0*edgeFactor);
                 }else if(distance<=length){
                     // Medium-width, multiple closely spaced contrasting layers.
-                    double t=distance/length;
-                    profile=(1.0-0.70*t) * (0.84+0.16*Math.cos(Math.PI*t*3.0));
+                    double shapeFactor=distance/length;
+                    profile=(1.0-0.70*shapeFactor) * (0.84+0.16*Math.cos(Math.PI*shapeFactor*3.0));
                 }else{
-                    double t=(length+edgeWidth-distance)/edgeWidth;
-                    profile=0.30*Math.max(0.0,t*t*(3.0-2.0*t));
+                    double endFactor=(length+edgeWidth-distance)/edgeWidth;
+                    profile=0.30*Math.max(0.0,endFactor*endFactor*(3.0-2.0*endFactor));
                 }
                 final double signedAmplitude=(isVoidDirection?-1.0:1.0)*amplitude*profile;
                 section[i]=(short)Math.round(signedAmplitude);
