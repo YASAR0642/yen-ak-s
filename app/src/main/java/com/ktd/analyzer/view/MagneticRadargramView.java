@@ -61,7 +61,7 @@ public final class MagneticRadargramView extends View {
     public double getEpsilon(){return epsilonR;}
     public void setFilterMode(int f){filterMode=Math.max(0,Math.min(3,f));invalidate();}
     public int getFilterMode(){return filterMode;}
-    public void setPalette(int v){palette=Math.max(0,Math.min(ColorMaps.COUNT-1,v));invalidate();}
+    public void setPalette(int v){palette=Math.max(0,Math.min(4,v));invalidate();}
     public int getPalette(){return palette;}
     public void setHyperbolaEnhance(boolean v){hyperbolicContrast=v;invalidate();}
     public void setAutoContrast(boolean v){autoContrast=v;invalidate();}
@@ -109,9 +109,11 @@ public final class MagneticRadargramView extends View {
         if(traces.size()>=MAX_TRACES)traces.removeFirst();
         traces.addLast(t);if(!browseEnabled)browseOffset=0;invalidate();
     }
-    // Neutral gray background on ALL 11 GMR palettes. Polarity is never reversed:
-    // negative sensor deviation -> BLUE (shallower/up), positive -> RED (deeper/down).
-    private static final int GMR_GRAY=Color.rgb(101,108,116);
+    // Five immediately recognizable colors in every GMR palette:
+    // strong negative = blue, weak negative = cyan, ground = neutral gray,
+    // weak positive = yellow, strong positive = red.
+    // A palette variation changes shade/contrast, NOT polarity or threshold.
+    private static final int GMR_GRAY=Color.rgb(104,110,116);
     private static int blend(int a,int b,float t){
         t=Math.max(0f,Math.min(1f,t));
         return Color.rgb(
@@ -121,19 +123,22 @@ public final class MagneticRadargramView extends View {
     }
     private int shade(double signed){
         if(Math.abs(signed)<0.001)return GMR_GRAY;
-        // The RENK selector changes visual vibrancy, not polarity or background.
-        float magnitude=(float)Math.min(1.0,Math.abs(signed));
-        float vibrancy=0.90f+0.025f*(palette%5);
-        // Palette 1/11: monochrome alternating reflections, analogous to the
-        // visual style in the supplied GPR screenshots (NOT true GPR echoes).
-        if(palette==0){
-            int gray=signed>=0 ? 239 : 26;
-            return blend(GMR_GRAY,Color.rgb(gray,gray,gray),Math.min(1f,magnitude*2.15f));
+        // Variations: classic, vivid, pastel, high contrast, deep.
+        final int[] blue={0xff1749dc,0xff0044ff,0xff4675ed,0xff0023b9,0xff172b95};
+        final int[] cyan={0xff37c9e9,0xff00e6ff,0xff88e6f5,0xff00c9fb,0xff1396cb};
+        final int[] yellow={0xffffdc32,0xffffed00,0xffffe876,0xffffff00,0xffe9be22};
+        final int[] red={0xfff03737,0xffff2424,0xffef6060,0xffef0000,0xffc51d2b};
+        int mode=Math.max(0,Math.min(4,palette));
+        float strength=(float)Math.min(1.0,Math.abs(signed));
+        // Distinct intermediate cyan/yellow remain visible instead of
+        // reducing eleven choices to almost identical two-color displays.
+        // No trace age, time, or horizontal x coordinate enters this mapping.
+        if(signed<0){
+            if(strength<0.32f)return blend(GMR_GRAY,cyan[mode],strength/0.32f);
+            return blend(cyan[mode],blue[mode],Math.min(1f,(strength-0.32f)/0.45f));
         }
-        int target=signed<0 ? Color.rgb(20,92,232) : Color.rgb(240,46,35);
-        int accent=signed<0 ? Color.rgb(85,204,255) : Color.rgb(255,205,50);
-        if(magnitude>0.72f)target=blend(target,accent,(magnitude-0.72f)*1.0f);
-        return blend(GMR_GRAY,target,Math.min(1f,magnitude*vibrancy*1.8f));
+        if(strength<0.32f)return blend(GMR_GRAY,yellow[mode],strength/0.32f);
+        return blend(yellow[mode],red[mode],Math.min(1f,(strength-0.32f)/0.45f));
     }
     private float[][] processed(List<GprProtocol.Trace> items,int rowCount,int visibleSamples){
         int n=items.size();float[][] result=new float[n][rowCount];

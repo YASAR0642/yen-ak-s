@@ -8,8 +8,8 @@ android {
         applicationId 'com.ktd.analyzer'
         minSdk 23
         targetSdk 35
-        versionCode 3981
-        versionName '3.9.81-gmr-dalga-profil' 
+        versionCode 3983
+        versionName '3.9.83-ortam-referansi-ortak' 
     }
 
     buildTypes {

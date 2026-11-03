@@ -8,7 +8,7 @@ package com.ktd.analyzer.data;
  * gelen ham float değeri kırpmaz. Ekran gösterimi ayrıca yuvarlanabilir.
  */
 public final class ReferenceModel {
-    public static final float GROUND_BAND = 10f;
+    public static final float GROUND_BAND = ReferenceMeterModel.ANOMALY_THRESHOLD;
     public static final int SIGNAL_MIN = 0;
     public static final int SIGNAL_MAX = 1023;
     private float reference = Float.NaN;

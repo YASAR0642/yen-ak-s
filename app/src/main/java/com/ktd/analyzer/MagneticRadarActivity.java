@@ -12,6 +12,7 @@ import android.view.Gravity;
 import android.widget.*;
 import com.ktd.analyzer.bluetooth.BluetoothClient;
 import com.ktd.analyzer.data.ReferenceModel;
+import com.ktd.analyzer.data.ReferenceMeterModel;
 import com.ktd.analyzer.data.SensorFrame;
 import com.ktd.analyzer.gpr.GprProtocol;
 import com.ktd.analyzer.view.MagneticRadargramView;
@@ -47,6 +48,7 @@ public final class MagneticRadarActivity extends Activity implements BluetoothCl
     private final Handler playbackHandler=new Handler(Looper.getMainLooper());
     private final ArrayList<Float> playback=new ArrayList<>();
     private boolean fileMode=false,playingFile=false,previewShowing=false;
+    private float playbackReference=Float.NaN;
     private int playPos=0;
     private long lastArrivalMs=0;
     private double averageArrivalNs=0;
@@ -63,7 +65,7 @@ public final class MagneticRadarActivity extends Activity implements BluetoothCl
     private Button startButton;
     private boolean running=false,zeroed=false,mineral=false;
     private float gain=1f, boost=2f;
-    private static final int GMR_CLASSIC_PALETTE_COUNT=11;
+    private static final int GMR_CLASSIC_PALETTE_COUNT=5;
     private int palette=0;
     
     private final ArrayList<Float> captured=new ArrayList<>();
@@ -166,6 +168,7 @@ public final class MagneticRadarActivity extends Activity implements BluetoothCl
             if(!BluetoothClient.isConnected()){
                 Toast.makeText(this,"Bluetooth bağlantısı gerekli",Toast.LENGTH_SHORT).show();return;
             }
+            reference.clear();zeroed=false; // Each new live recording takes its own ground reference.
             bluetooth.send("RATE=100\n");if(!bluetooth.send("LIVE_START\n"))return;running=true;getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);radar.setBrowseEnabled(false);showStartButton(true);
         });
         add(controls,startButton);
@@ -187,7 +190,7 @@ public final class MagneticRadarActivity extends Activity implements BluetoothCl
     }
     private void updateButtonColors(){
         if(colorButton!=null){
-            int[] colors={0xff57616e,0xff893f52,0xff236bb5,0xff674cb2,0xff138ca8,0xffa97832,0xff43865c,0xffba548a,0xff447184,0xff816b54,0xff4e647b};
+            int[] colors={0xff276eaa,0xff138da4,0xff777b82,0xffa98627,0xffa94743};
             colorButton.setBackgroundTintList(android.content.res.ColorStateList.valueOf(colors[Math.floorMod(palette,colors.length)]));
             colorButton.setTextColor(Color.WHITE);
         }
@@ -237,8 +240,15 @@ public final class MagneticRadarActivity extends Activity implements BluetoothCl
         final double magnitude=Math.abs(signedRaw);
         final double threshold=15.0;
         if(magnitude>=threshold){
-            final double sensorZ=512.0+signedRaw;
-            final double projectDepth=Math.max(0.25,Math.min(10.0,800.0/Math.max(1.0,sensorZ)));
+            final float activeReference=fileMode?playbackReference:reference.reference();
+            final float calculated=ReferenceMeterModel.metersFromDelta(signedRaw,activeReference);
+            // Values outside the visible 0-10 display are not falsely pinned at 10 m.
+            final double projectDepth=calculated;
+            if(!Double.isFinite(projectDepth)||projectDepth<0.25||projectDepth>10.0){
+                radar.add(new GprProtocol.Trace(sequence++,section));
+                radar.setSurveyPositionCm(0);panels.invalidate();
+                perfMonitor.processEnd(processToken);return;
+            }
             final double center=projectDepth*(size-1)/10.0;
             // Width represents visual anomaly intensity, not measured target height.
             // Multi-lobed Ricker response adds GPR-like alternating dark/light bands
@@ -347,7 +357,8 @@ public final class MagneticRadarActivity extends Activity implements BluetoothCl
         if(request==SAVE){
             ArrayList<Float> copy; synchronized(captured){copy=new ArrayList<>(captured);}
             new Thread(()->{try(OutputStream stream=getContentResolver().openOutputStream(uri);DataOutputStream out=new DataOutputStream(new BufferedOutputStream(stream))){
-                out.writeInt(MAGIC);out.writeInt(1);out.writeInt(copy.size());
+                out.writeInt(MAGIC);out.writeInt(2);
+                out.writeFloat(reference.reference());out.writeInt(copy.size());
                 for(Float value:copy)out.writeFloat(value);
                 out.flush();
                 runOnUiThread(()->{setFileTitle(displayFileName(uri));Toast.makeText(this,"Şifresiz KMGR kaydı tamamlandı",Toast.LENGTH_SHORT).show();});
@@ -360,7 +371,9 @@ public final class MagneticRadarActivity extends Activity implements BluetoothCl
                     values=decryptRecord(in);
                 }else if(fileMagic==MAGIC){
                     // Backwards compatible reader for older, unencrypted recordings.
-                    if(in.readInt()!=1)throw new java.io.IOException("Desteklenmeyen eski kayıt");
+                    int formatVersion=in.readInt();
+                    if(formatVersion!=1&&formatVersion!=2)throw new java.io.IOException("Desteklenmeyen kayıt sürümü");
+                    playbackReference=formatVersion==2?in.readFloat():Float.NaN;
                     int count=in.readInt();
                     if(count<0||count>10000000)throw new java.io.IOException("Geçersiz örnek sayısı");
                     values=new ArrayList<>(count);

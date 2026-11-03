@@ -1,0 +1,11 @@
+KTD 3D ANALYZER v3.9.82 - 5 RENK GMR
+
+GMR renk ekraninda bes anlasilir ana renk:
+Negatif guclu = mavi; negatif orta = camgobegi; referans = gri;
+pozitif orta = sari; pozitif guclu = kirmizi.
+
+RENK dugmesi artik 1/5 - 5/5 araligindadir. Bes secenekte renk tonu
+farklilasir ancak referans ve manyetik polarite sabit kalir.
+GMR disindaki uygulama kodlari / ESP32 V13 / 800-Z hesabi degismemistir.
+ZIP yuklenmeden once acilip klasor yapisiyla GitHub ana dizinine yuklenmelidir.
+Kaynak ZIP dogrulandi; APK build ve telefon testi yapilmadi.

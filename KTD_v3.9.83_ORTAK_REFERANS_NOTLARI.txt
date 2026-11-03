@@ -1,0 +1,21 @@
+KTD v3.9.83 — Ortak ortam referansı
+
+NORMAL, 2D, 3D, 4D, GMR ve ANALİZ ET, aynı taramanın gerçek R referansını
+kullanarak farkı hesaplar. 512 sabiti aktif canlı hesaplardan kaldırıldı.
+
+Delta = hamZ - R.
+Z_gerilim_normalizasyonu = 1023 * abs(Delta) / (Delta >= 0 ? 1023-R : R)
+Proje metre indeksi = 800 / Z_gerilim_normalizasyonu.
+Delta < 15 ise ekranda anomali derinliği belirtilmez.
+
+ÖNEMLİ: Bu bir manyetik sinyal-gücü indeksi olup kalibrasyonsuz gerçek fiziksel
+mesafe olarak doğrulanamaz. 0-10 m aralığı dışındaki GMR anomalileri 10 m
+konumuna yanlış zorlanmaz.
+
+CSV X/Y/Z/C korunmuştur. Eski C=800/hamZ sütunu geriye dönük uyumluluk içindir;
+yeni referans-normalize görsel cetvel o C sütunundan hesaplanmaz.
+GMR yeni KMGR kayıtlarında versiyon 2 ile başlangıç R referansı da saklanır;
+eski versiyon 1 kayıtlarında R saklanmadığından güvenilir yeniden konumlama
+yapılamaz; eski kayıtlar açılır ancak yeniden derinlik eşlenemez.
+
+ESP32 firmware kodu değişmedi. Tam APK derlemesi ve saha testi yapılmadı.

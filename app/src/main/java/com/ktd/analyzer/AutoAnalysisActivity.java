@@ -35,7 +35,7 @@ public final class AutoAnalysisActivity extends Activity {
    double length=data.rows*data.stepCm/100.0;
    line(content,"ÇEKİM ALANI",20);
    line(content,data.cols+" × "+data.rows+" örnek  •  "+fmt(width*length)+" m²",18);
-   double ref=Float.isFinite(data.reference)?data.reference:512.0;
+   double ref=com.ktd.analyzer.data.ReferenceInverseDepth.referenceOf(data);
    double positive=0,negative=0;
    double strongestPositive=0,strongestNegative=0;
    double positiveZ=Double.NaN,negativeZ=Double.NaN;
@@ -43,20 +43,22 @@ public final class AutoAnalysisActivity extends Activity {
     if(!data.filled[r][c])continue;
     double z=data.raw[r][c];if(!Double.isFinite(z)||z<=0)continue;
     double difference=z-ref;
-    // ±10 referans toleransı. Gruplar işaretlidir; değerli metal/boşluk teşhisi değildir.
-    if(difference>10){positive+=difference-10;if(difference>strongestPositive){strongestPositive=difference;positiveZ=z;}}
-    if(difference< -10){negative+=-difference-10;if(-difference>strongestNegative){strongestNegative=-difference;negativeZ=z;}}
+    // ±15 referans toleransı. Gruplar işaretlidir; değerli metal/boşluk teşhisi değildir.
+    if(difference>15){positive+=difference-15;if(difference>strongestPositive){strongestPositive=difference;positiveZ=z;}}
+    if(difference< -15){negative+=-difference-15;if(-difference>strongestNegative){strongestNegative=-difference;negativeZ=z;}}
    }
    // Bağımsız iki sinyal gücü; toplamları 100 olmak zorunda değildir.
    int metal=percent(positive);
    int cavity=percent(negative);
    line(content,"BOŞLUK OLASILIĞI",20);
    line(content,cavity+"%",28);
-   if(Double.isFinite(negativeZ))line(content,"Boşluk derinliği: "+fmt(800.0/negativeZ)+" m",17);
+   double cavityDepth=com.ktd.analyzer.data.ReferenceMeterModel.meters((float)negativeZ,(float)ref);
+   if(Double.isFinite(cavityDepth))line(content,"Boşluk derinliği: "+fmt(cavityDepth)+" m",17);
    else line(content,"Boşluk bulgusu yok.",17);
    line(content,"METAL OLASILIĞI",20);
    line(content,metal+"%",28);
-   if(Double.isFinite(positiveZ))line(content,"Metal derinliği: "+fmt(800.0/positiveZ)+" m",17);
+   double metalDepth=com.ktd.analyzer.data.ReferenceMeterModel.meters((float)positiveZ,(float)ref);
+   if(Double.isFinite(metalDepth))line(content,"Metal derinliği: "+fmt(metalDepth)+" m",17);
    else line(content,"Metal bulgusu yok.",17);
   }
   scroll.addView(content);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));

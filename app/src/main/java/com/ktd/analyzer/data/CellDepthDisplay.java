@@ -30,8 +30,8 @@ public final class CellDepthDisplay {
         if(Float.isFinite(site)&&site>=0)return new Value(Source.VERIFIED,site);
         // Ortak KTD proje dönüşümü: 2D = 3D = 4D, 800 / ham Z.
         // Ölçek, bilinen derinliklerde saha kalibrasyonu yapılana kadar proje değeridir.
-        float calculated=InverseSignalIndex.fromRaw(d.raw[row][col]);
-        if(Float.isFinite(calculated))return new Value(Source.DEVICE_C,calculated);
+        float calculated=ReferenceMeterModel.meters(d.raw[row][col],ReferenceInverseDepth.referenceOf(d));
+        if(Float.isFinite(calculated))return new Value(Source.INVERSE_INDEX,calculated);
         return UNKNOWN;
     }
 }
