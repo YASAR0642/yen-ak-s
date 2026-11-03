@@ -1,0 +1,8 @@
+KTD 3D ANALYZER v3.9.76 FINAL
+- v3.9.75 GMR 0-10m, solmasiz kaydirma ve polarite goruntulemesi korunur.
+- Analiz ekraninda 'DENEYSEL' ibareleri ve uzun anomali derinlik basliklari kaldirildi.
+- BOŞLUK OLASILIĞI, Boşluk derinliği, METAL OLASILIĞI, Metal derinliği yazilari kullanilir.
+- Cekim alani ve mevcut yuzde/depth hesaplari degistirilmedi.
+- ESP32 V13 degistirilmedi.
+- Paket ZIP testi yapildi; APK derlemesi ve saha testi yapilmadi.
+- Olasi malzeme siniflandirmasi manyetik sinyal yorumudur, dogrulanmis malzeme teshisi degildir.

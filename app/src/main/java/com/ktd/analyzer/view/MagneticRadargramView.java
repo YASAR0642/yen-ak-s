@@ -31,7 +31,7 @@ public final class MagneticRadargramView extends View {
     private final ArrayDeque<GprProtocol.Trace> traces=new ArrayDeque<>();
     private final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint label=new Paint(Paint.ANTI_ALIAS_FLAG);
-    private int nSamples=0, maxAbsolute=100, filterMode=0, palette=0;
+    private int nSamples=0, maxAbsolute=16000, filterMode=0, palette=0;
     private static final double CM_PER_TRACE=7.5; // 180 cm / 24 measurements, field-calibrated example
     private double surveyPositionCm=0;
     public void setSurveyPositionCm(double cm){surveyPositionCm=Math.max(0,cm);invalidate();}
@@ -50,7 +50,7 @@ public final class MagneticRadargramView extends View {
         label.setColor(Color.rgb(205,224,238));
     }
     public void clear(){traces.clear();nSamples=0;lastSequence=-1;browseOffset=0;invalidate();}
-    public void resetSession(){clear();dtNs=Double.NaN;dxMeters=Double.NaN;demo=false;maxAbsolute=100;invalidate();}
+    public void resetSession(){clear();dtNs=Double.NaN;dxMeters=Double.NaN;demo=false;maxAbsolute=16000;invalidate();}
     public void setGain(float value){gain=Math.max(0f,Math.min(10f,value));invalidate();}
     public float getGain(){return gain;}
     public void setDepthGain(int section,float value){if(section>=0&&section<5){depthGains[section]=Math.max(0f,Math.min(10f,value));invalidate();}}
@@ -105,8 +105,7 @@ public final class MagneticRadargramView extends View {
         if(t==null||t.samples.length<16)return;
         if(nSamples!=0&&nSamples!=t.samples.length)clear();
         nSamples=t.samples.length;lastSequence=t.sequence;
-        int peak=1;for(short s:t.samples)peak=Math.max(peak,Math.abs((int)s));
-        maxAbsolute=Math.max(8,Math.round(maxAbsolute*.88f+peak*.12f));
+        // Fixed color scaling: recorded traces never fade or change with later peaks.
         if(traces.size()>=MAX_TRACES)traces.removeFirst();
         traces.addLast(t);if(!browseEnabled)browseOffset=0;invalidate();
     }
@@ -154,9 +153,11 @@ public final class MagneticRadargramView extends View {
         if(hasTimeAxis()&&Double.isFinite(timeWindowNs)) visibleSamples=Math.max(2,Math.min(nSamples,1+(int)Math.floor(timeWindowNs/dtNs)));
         if(visibleN>0&&visibleSamples>=2){
             int rows=Math.min(visibleSamples,600);
+            int savedFilter=filterMode;filterMode=FILTER_NONE;
             float[][] sampled=processed(items,rows,visibleSamples);
-            int peak=maxAbsolute;
-            if(autoContrast){
+            filterMode=savedFilter;
+            int peak=16000;
+            if(false && autoContrast){
                 int[] hist=new int[items.size()*rows];int k=0;
                 for(int i=0;i<items.size();i++)for(int y=0;y<rows;y++)hist[k++]=(int)Math.abs(sampled[i][y]);
                 java.util.Arrays.sort(hist);peak=Math.max(8,hist[(int)((hist.length-1)*.96)]);
@@ -165,7 +166,7 @@ public final class MagneticRadargramView extends View {
             double scale=Math.max(1,peak)/Math.max(.0001f,gain);
             for(int x=0;x<visibleN;x++)for(int y=0;y<rows;y++){
                 double a=sampled[x][y];
-                if(hyperbolicContrast){double a0=sampled[Math.max(0,x-1)][y],a1=sampled[Math.min(visibleN-1,x+1)][y];a+=(a-(a0+a1)*.5)*.48;}
+                if(false && hyperbolicContrast){double a0=sampled[Math.max(0,x-1)][y],a1=sampled[Math.min(visibleN-1,x+1)][y];a+=(a-(a0+a1)*.5)*.48;}
                 int section=Math.min(4,(int)((long)y*5/rows));
                 float localGain=depthGains[section];
                 double response=a/scale*localGain;
@@ -178,7 +179,9 @@ public final class MagneticRadargramView extends View {
             p.setFilterBitmap(true);p.setStyle(Paint.Style.FILL);
             // Fixed trace pitch. Old traces leave from left after 180; no rescaling during playback.
             int drawnW=Math.max(1,Math.round(ww*(visibleN/(float)windowTraces)));
-            canvas.drawBitmap(bmp,new Rect(0,0,visibleN,rows),new Rect(left,top,left+drawnW,top+hh),p);
+            // Latest sample always enters from the right; old samples scroll left.
+            // No position/time-based transparency or fading.
+            canvas.drawBitmap(bmp,new Rect(0,0,visibleN,rows),new Rect(left+ww-drawnW,top,left+ww,top+hh),p);
             bmp.recycle();
         }
         // Horizontal axis is the received observation index, not measured distance.
@@ -188,12 +191,12 @@ public final class MagneticRadargramView extends View {
         int firstSample=Math.max(0,traces.size()-browseOffset-visibleN);
         int stepLabels=Math.max(1,windowTraces/4);
         for(int i=0;i<visibleN;i+=stepLabels){
-            float xx=left+ww*(i/(float)windowTraces);
+            float xx=left+ww*(1f-visibleN/(float)windowTraces+i/(float)windowTraces);
             canvas.drawText(Integer.toString(firstSample+i+1),xx,top-8*dp,label);
         }
         p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(dp*.65f);p.setColor(Color.rgb(85,111,125));
         canvas.drawRect(left,top,left+ww,top+hh,p);
-        // Left: observation number. Right: the project 800/Z display scale (0..5 m).
+        // Left: observation number. Right: the project 800/Z display scale (0..10 m).
         // It is not an independently measured GPR time-of-flight depth.
         float axisX=left+ww;
         p.setStyle(Paint.Style.FILL);p.setColor(Color.BLACK);canvas.drawRect(axisX,top-4*dp,w,top+hh+2*dp,p);
@@ -202,14 +205,17 @@ public final class MagneticRadargramView extends View {
         canvas.drawText("ÖRNEK",left*.5f,top-9*dp,label);
         label.setTextAlign(Paint.Align.RIGHT);label.setColor(Color.rgb(238,237,178));
         canvas.drawText(Integer.toString(firstSample+Math.max(1,visibleN)),left-4*dp,top+14*dp,label);
+        // Surface reference band: 0 to 0.25 m on the fixed 10 m ruler.
+        p.setStyle(Paint.Style.FILL);p.setColor(Color.argb(38,56,183,117));
+        canvas.drawRect(left,top,left+ww,top+hh*(0.25f/10f),p);
         final int steps=10;
         for(int i=0;i<=steps;i++){
             float y=top+hh*i/(float)steps;
             p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(dp*.55f);p.setColor(Color.argb(45,190,215,235));canvas.drawLine(left,y,axisX,y,p);
             p.setColor(Color.rgb(61,83,96));canvas.drawLine(axisX,y,w,y,p);
-            double meter=5.0*i/steps;
+            double meter=10.0*i/steps;
             label.setTextAlign(Paint.Align.RIGHT);label.setColor(Color.rgb(205,224,238));
-            canvas.drawText(String.format(java.util.Locale.US,"%.1f",meter),w-3*dp,y+(i==0?10*dp:i==steps?-2*dp:4*dp),label);
+            canvas.drawText(String.format(java.util.Locale.US,"%.0f",meter),w-3*dp,y+(i==0?10*dp:i==steps?-2*dp:4*dp),label);
         }
         for(int x=1;x<8;x++){float cx=left+x*ww/8f;p.setColor(Color.argb(65,145,168,183));canvas.drawLine(cx,top,cx,top+hh,p);}    
     

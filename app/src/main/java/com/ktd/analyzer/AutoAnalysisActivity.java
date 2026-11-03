@@ -50,14 +50,14 @@ public final class AutoAnalysisActivity extends Activity {
    // Bağımsız iki sinyal gücü; toplamları 100 olmak zorunda değildir.
    int metal=percent(positive);
    int cavity=percent(negative);
-   line(content,"BOŞLUK OLASILIĞI (DENEYSEL)",20);
+   line(content,"BOŞLUK OLASILIĞI",20);
    line(content,cavity+"%",28);
-   if(Double.isFinite(negativeZ))line(content,"Boşluk yönlü anomali Z derinliği: "+fmt(800.0/negativeZ)+" m",17);
-   else line(content,"Boşluk yönlü anomali bulunmadı.",17);
-   line(content,"METAL OLASILIĞI (DENEYSEL)",20);
+   if(Double.isFinite(negativeZ))line(content,"Boşluk derinliği: "+fmt(800.0/negativeZ)+" m",17);
+   else line(content,"Boşluk bulgusu yok.",17);
+   line(content,"METAL OLASILIĞI",20);
    line(content,metal+"%",28);
-   if(Double.isFinite(positiveZ))line(content,"Metal yönlü anomali Z derinliği: "+fmt(800.0/positiveZ)+" m",17);
-   else line(content,"Metal yönlü anomali bulunmadı.",17);
+   if(Double.isFinite(positiveZ))line(content,"Metal derinliği: "+fmt(800.0/positiveZ)+" m",17);
+   else line(content,"Metal bulgusu yok.",17);
   }
   scroll.addView(content);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
   setContentView(root);Ui.applySafeInsets(this,root);

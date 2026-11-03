@@ -1,0 +1,4 @@
+GMR: 0-10 m, 0-0.25 m yuzey, +/-30 esik, filtresiz ham fark, lokal bozulma,
+hiperbol ve uzun dikey pik yok, sagdan giris soldan cikis, hic solma yok.
+800/Z sensorun bagimsiz olctugu fiziksel derinlik degildir. ESP32 V13 degismedi.
+Android APK ve gercek cihazda test edilmedi.

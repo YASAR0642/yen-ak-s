@@ -232,7 +232,7 @@ public final class MagneticRadarActivity extends Activity implements BluetoothCl
         lastArrivalMs=now;
         final long queuedAtNs=System.nanoTime();
         runOnUiThread(()->{perfMonitor.queueWaitNs(System.nanoTime()-queuedAtNs);if(!running)return;float z=ReferenceModel.normalize(v);if(!zeroed){reference.zero(z);zeroed=true;return;}
-            float delta=reference.visualDelta(z);appendDelta(delta,true);
+            float delta=reference.delta(z);appendDelta(delta,true);
         });
     }
     // GMR anomaly stream: one received magnetic measurement per horizontal column.
@@ -243,30 +243,24 @@ public final class MagneticRadarActivity extends Activity implements BluetoothCl
         long t=perfMonitor.processBegin();
         if(store){synchronized(captured){captured.add(delta);}}
         if(!Float.isFinite(delta)){perfMonitor.processEnd(t);return;}
+        // Signed raw sensor difference. No drift subtraction or smoothing.
         float corrected=delta;
-        // Slowly varying drift suppression is optional and never changes recordings.
-        baseline=baseline*0.995f+delta*0.005f;
-        if(mineral)corrected-=baseline;
-        // Sensor's 512-centred app reading reconstructed from signed reference difference.
         float z=512f+corrected;
-        double depthM=800.0/Math.max(1.0,z);
-        depthM=Math.max(0.0,Math.min(5.0,depthM));
+        double depthM=Math.max(0.25,Math.min(10.0,800.0/Math.max(1.0,z)));
         final int size=256;
         final short[] section=new short[size];
-        double center=depthM/5.0*(size-1);
         double magnitude=Math.abs(corrected);
-        // Reject minor fluctuations but preserve weak repeatable anomalies.
-        if(magnitude>2.0){
-            // The displayed narrow disturbance width is a visual cue, not object size.
-            double sigma=2.5+Math.min(4.0,magnitude/24.0);
-            double strength=Math.signum(corrected)*Math.min(22000.,magnitude*230.0);
+        if(magnitude>=30.0){
+            // Local disturbance, no long spike, stretching or fake hyperbola.
+            double center=depthM/10.0*(size-1);
+            double width=2.8+Math.min(4.0,(magnitude-30.0)/24.0);
+            double strength=Math.signum(corrected)*Math.min(26000.0,9000.0+(magnitude-30.0)*190.0);
             for(int i=0;i<size;i++){
-                double n=(i-center)/sigma;
-                // Single compact disturbance with two subtle polarity side-lobes.
-                double core=Math.exp(-0.5*n*n);
-                double shoulder=Math.exp(-0.5*Math.pow((Math.abs(n)-2.2)/0.8,2));
-                double amp=strength*(core-0.19*shoulder);
-                section[i]=(short)Math.max(-32767,Math.min(32767,Math.round(amp)));
+                double distance=Math.abs(i-center);
+                if(distance<=width){
+                    double edge=0.5+0.5*Math.cos(Math.PI*distance/width);
+                    section[i]=(short)Math.round(strength*edge);
+                }
             }
         }
         radar.add(new GprProtocol.Trace(sequence++,section));
