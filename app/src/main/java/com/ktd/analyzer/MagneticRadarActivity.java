@@ -63,7 +63,8 @@ public final class MagneticRadarActivity extends Activity implements BluetoothCl
     private Button startButton;
     private boolean running=false,zeroed=false,mineral=false;
     private float gain=1f, boost=2f;
-    private int palette=1;
+    private static final int GMR_CLASSIC_PALETTE_COUNT=11;
+    private int palette=0;
     
     private final ArrayList<Float> captured=new ArrayList<>();
     private static final double CALIBRATED_CM_PER_SAMPLE=180.0/24.0; // 180 cm measured for 24 values in cantimetre.kmgr; only valid at same scanning step
@@ -170,7 +171,7 @@ public final class MagneticRadarActivity extends Activity implements BluetoothCl
         add(controls,startButton);
         Button open=button("DOSYA AÇ");open.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xff265d86));open.setOnClickListener(v->open());add(controls,open);
         Button save=button("KAYDET");save.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xff247c67));save.setOnClickListener(v->save());add(controls,save);
-        Button color=button("RENK");colorButton=color;color.setOnClickListener(v->{palette=(palette+1)%ColorMaps.COUNT;radar.setPalette(palette);color.setText("RENK\n"+(palette+1)+"/"+ColorMaps.COUNT);panels.invalidate();updateButtonColors();});add(controls,color);
+        Button color=button("RENK");colorButton=color;color.setOnClickListener(v->{palette=(palette+1)%GMR_CLASSIC_PALETTE_COUNT;radar.setPalette(palette);color.setText("RENK\n"+(palette+1)+"/"+GMR_CLASSIC_PALETTE_COUNT);panels.invalidate();updateButtonColors();});add(controls,color);
         Button filter=button("MİNERAL\nKAPALI");mineralButton=filter;filter.setOnClickListener(v->{mineral=!mineral;filter.setText(mineral?"MİNERAL\nAÇIK":"MİNERAL\nKAPALI");updateButtonColors();});add(controls,filter);
         Button reset=button("SIFIRLA");reset.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xff965344));reset.setOnClickListener(v->{setFileTitle("CANLI ÇEKİM");fileMode=false;playingFile=false;previewShowing=false;lastArrivalMs=0;averageArrivalNs=0;timingSamples=0;radar.setWindowTraces(72);playbackHandler.removeCallbacks(playTick);showStartButton(false);playback.clear();playPos=0;reference.clear();zeroed=false;sequence=0;resetDetection();radar.clear();radar.setSurveyPositionCm(0);radar.setBrowseEnabled(true);panels.invalidate();synchronized(captured){captured.clear();}});add(controls,reset);
         body.addView(controls,new LinearLayout.LayoutParams(0,-1,16));
@@ -250,11 +251,11 @@ public final class MagneticRadarActivity extends Activity implements BluetoothCl
         final int size=256;
         final short[] section=new short[size];
         double magnitude=Math.abs(corrected);
-        if(magnitude>=30.0){
+        if(magnitude>=15.0){
             // Local disturbance, no long spike, stretching or fake hyperbola.
             double center=depthM/10.0*(size-1);
-            double width=2.8+Math.min(4.0,(magnitude-30.0)/24.0);
-            double strength=Math.signum(corrected)*Math.min(26000.0,9000.0+(magnitude-30.0)*190.0);
+            double width=5.0+Math.min(4.0,(magnitude-15.0)/24.0);
+            double strength=Math.signum(corrected)*Math.min(26000.0,9000.0+(magnitude-15.0)*190.0);
             for(int i=0;i<size;i++){
                 double distance=Math.abs(i-center);
                 if(distance<=width){

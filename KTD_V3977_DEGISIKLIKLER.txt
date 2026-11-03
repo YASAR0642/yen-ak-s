@@ -1,0 +1,3 @@
+KTD 3D ANALYZER 3.9.77
+Yalnizca GMR: Anomali esigi +15/-15 birim. Cizgi kalinligi orta derece arttirildi (5-9 ornek). Klasik 11 renk paleti geri getirildi; ilk secim KTD Spectrum. Mevcut akisin yerlesimi, 0-10 m ekseni ve solmasiz gosterim korunur. Bluetooth, ESP32, 2D/3D/4D ve ANALIZ ET degismedi.
+APK build ve saha testi yapilmadi.
