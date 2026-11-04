@@ -56,6 +56,12 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
     private ScanGridContourView gridView;
 
     private boolean running=true,awaitZero=true,manualSampleRequested=false,groundModeArmed=false;
+    private boolean legacyDeviceMode=false; // Nano / generic stream mode: Android owns the grid coordinates.
+    private boolean nanoButtonAutoMode=false; // Only when device emits one frame per hardware press.
+    private long lastNanoTriggerMs=0L;
+    private boolean nanoButtonAutoMode=false; // Only when the device emits a frame per hardware press.
+    private long lastNanoTriggerMs=0L;
+    private Button deviceModeBtn;
     private boolean showValue=false,showDepth=false;
     private SensorFrame lastFrame,replayToIgnore;
     private long lastCapture=0,linePauseUntil=0,pendingRequestedAtMs=0;
@@ -73,6 +79,9 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
         voice=new VoiceGuide(this);
         voice.setEnabled(Prefs.voiceGuide(this));
         palette=Prefs.palette(this);
+        legacyDeviceMode=getPreferences(MODE_PRIVATE).getBoolean("legacy_device_mode", false);
+        nanoButtonAutoMode=getPreferences(MODE_PRIVATE).getBoolean("nano_button_auto", false);
+        nanoButtonAutoMode=getPreferences(MODE_PRIVATE).getBoolean("nano_button_auto", false);
         newData();
         build();
     }
@@ -101,7 +110,7 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
         data.stepCm=Prefs.stepCm(this);
         data.startCorner=Prefs.startCorner(this);
         data.serpentine=Prefs.serpentine(this);
-        index=0;running=true;ref.clear();lastFrame=null;awaitZero=true;manualSampleRequested=false;groundModeArmed=false;linePauseUntil=0;lastCapture=0;pendingRequestedAtMs=0;pendingXcm=Float.NaN;pendingYcm=Float.NaN;
+        index=0;running=true;ref.clear();lastFrame=null;awaitZero=true;manualSampleRequested=false;groundModeArmed=false;lastNanoTriggerMs=0L;lastNanoTriggerMs=0L;linePauseUntil=0;lastCapture=0;pendingRequestedAtMs=0;pendingXcm=Float.NaN;pendingYcm=Float.NaN;
         analysisGeneration++;gridDepthResult=null;
         ScanSessionStore.current=data;
     }
@@ -126,6 +135,24 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
             applyOverlayMode();
         });
         toggles.addView(connectionBtn,toggleLp());toggles.addView(valueBtn,toggleLp());toggles.addView(depthBtn,toggleLp());root.addView(toggles,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,48)));
+
+        // The mode is explicit: never silently assign untagged stream packets to ESP32 cells.
+        deviceModeBtn=Ui.button(this,deviceModeLabel(),false);
+        deviceModeBtn.setOnClickListener(v->{
+            if(data.count>0 || ref.hasReference()){
+                Toast.makeText(this,"Cihaz değiştirmek için önce Yeni Tarama seçin",Toast.LENGTH_LONG).show();return;
+            }
+            if(!legacyDeviceMode){legacyDeviceMode=true;nanoButtonAutoMode=false;}
+            else if(!nanoButtonAutoMode){nanoButtonAutoMode=true;}
+            else{legacyDeviceMode=false;nanoButtonAutoMode=false;}
+            getPreferences(MODE_PRIVATE).edit()
+                .putBoolean("legacy_device_mode",legacyDeviceMode)
+                .putBoolean("nano_button_auto",nanoButtonAutoMode).apply();
+            deviceModeBtn.setText(deviceModeLabel());
+            manualSampleRequested=false;pendingRequestedAtMs=0;groundModeArmed=false;
+            if(!legacyDeviceMode)ensureGroundMode();
+        });
+        root.addView(deviceModeBtn,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,39)));
 
         // Kullanıcı isteği: 2D kareleri dışında açıklama satırı yok.
         depthHint=null;
@@ -155,6 +182,16 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
         root.addView(bottomActions,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,58)));
 
         setContentView(root);Ui.applySafeInsets(this,root);applyOverlayMode();updateConnectionButton();
+    }
+
+    private String deviceModeLabel(){
+        return !legacyDeviceMode?"CİHAZ: ESP32":
+               nanoButtonAutoMode?"CİHAZ: NANO BUTON":"CİHAZ: NANO TELEFON";
+    }
+
+    private String deviceModeLabel(){
+        return !legacyDeviceMode?"CİHAZ: ESP32":
+               nanoButtonAutoMode?"CİHAZ: NANO BUTON":"CİHAZ: NANO TELEFON";
     }
 
     private LinearLayout.LayoutParams toggleLp(){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,Ui.dp(this,42),1);p.setMargins(Ui.dp(this,3),0,Ui.dp(this,3),0);return p;}
@@ -285,14 +322,14 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
      * komutuyla gelir.
      */
     private void ensureGroundMode(){
-        if(groundModeArmed || !BluetoothClient.isConnected())return;
+        if(legacyDeviceMode || groundModeArmed || !BluetoothClient.isConnected())return;
         if(bt.send("GROUND_START\n"))groundModeArmed=true;
     }
 
     /** SIFIRLA yeni bir çekimdir: eski referans ve hücreler KESİNLİKLE karışmaz. */
     private void zeroNow(){
         if(!beginFreshScan())return;
-        if(BluetoothClient.isConnected())bt.send("REF\n");
+        if(BluetoothClient.isConnected()&&!legacyDeviceMode)bt.send("REF\n");
         Toast.makeText(this,"Yeni çekim • yeni ortam referansı bekleniyor",Toast.LENGTH_SHORT).show();
     }
 
@@ -316,6 +353,11 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
         float yCoord=(data.startCorner==1?(data.cols-1-q[1]):q[1])*data.stepCm/100f;
         manualSampleRequested=true;
         pendingRequestedAtMs=System.currentTimeMillis();pendingXcm=xCoord*100f;pendingYcm=yCoord*100f;
+        if(legacyDeviceMode){
+            // Do not command an unknown Nano firmware. Wait for its NEXT genuine packet;
+            // the first button press captures reference, then one packet per grid cell.
+            return;
+        }
         String cmd=String.format(Locale.US,"SAMPLE X=%.0f Y=%.0f\n",xCoord*100f,yCoord*100f);
         boolean sent=bt.send(cmd);
         if(!sent){manualSampleRequested=false;pendingRequestedAtMs=0;}
@@ -325,9 +367,55 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
     @Override public void onFrame(SensorFrame f){runOnUiThread(()->consume(f));}
     private void consume(SensorFrame f){
         if(f==null)return;
-        // onStart'taki global son-paket tekrarı referans veya örnek değildir.
+        // Never use a replayed frame as an initial reference or as a new Nano sample.
         if(replayToIgnore!=null&&f==replayToIgnore){replayToIgnore=null;return;}
         replayToIgnore=null;
+        // Optional hardware-button Nano mode: each incoming frame is interpreted
+        // as one press. This mode MUST NOT be used with continuous streaming devices.
+        if(legacyDeviceMode && nanoButtonAutoMode && !manualSampleRequested &&
+           !f.referencePacket && !data.full() && running){
+            long now=System.currentTimeMillis();
+            if(now-lastNanoTriggerMs>=700L){
+                int[] cell=cellForIndex(index);
+                if(cell[0]>=0&&cell[1]>=0){
+                    manualSampleRequested=true;pendingRequestedAtMs=now;
+                    pendingXcm=(data.rows-1-cell[0])*data.stepCm;
+                    pendingYcm=(data.startCorner==1?(data.cols-1-cell[1]):cell[1])*data.stepCm;
+                    lastNanoTriggerMs=now;
+                }
+            }
+        }
+        // Optional hardware-button Nano mode. ONLY use if the device emits
+        // one serial frame per hardware press, NOT with continuous streaming.
+        if(legacyDeviceMode && nanoButtonAutoMode && !manualSampleRequested &&
+           !f.referencePacket && !data.full() && running){
+            long now=System.currentTimeMillis();
+            if(now-lastNanoTriggerMs>=700L){
+                int[] cell=cellForIndex(index);
+                if(cell[0]>=0&&cell[1]>=0){
+                    manualSampleRequested=true;pendingRequestedAtMs=now;
+                    pendingXcm=(data.rows-1-cell[0])*data.stepCm;
+                    pendingYcm=(data.startCorner==1?(data.cols-1-cell[1]):cell[1])*data.stepCm;
+                    lastNanoTriggerMs=now;
+                }
+            }
+        }
+        // Reference packet is a native ESP32 concept, not an untagged legacy frame.
+        // The Nano firmware may produce continuous scalar values or one per hardware press.
+        // We accept exactly the FIRST NEW frame after the user has pressed ORNEK AL.
+        if(legacyDeviceMode && manualSampleRequested && !f.referencePacket){
+            float raw=coerceRawSignal(f.signal());
+            if(Float.isFinite(raw) && raw>1f && raw<1023f){
+                if(awaitZero || !ref.hasReference()){
+                    manualSampleRequested=false; pendingRequestedAtMs=0;
+                    acceptReference(raw);
+                    return;
+                }
+                // Stamp the current Android cell into this legacy frame.  X/Y stay
+                // consistent with the existing ESP32 grid protocol (centimetres).
+                f=new SensorFrame(pendingXcm,pendingYcm,raw,Float.NaN);
+            }
+        }
 
         if(f.referencePacket){
             float newRef=coerceRawSignal(f.signal());
@@ -358,7 +446,7 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
         if(!running||data.full()||!manualSampleRequested)return;
         long now=System.currentTimeMillis();
         // A delayed/out-of-order sample must NEVER occupy the next grid cell.
-        // Position is in cm in the device protocol; parsed SensorFrame coordinates are metres.
+        // Positions are centimetres in the native protocol and Android legacy stamping.
         if(now-pendingRequestedAtMs>6000L){manualSampleRequested=false;return;}
         if(!f.hasXYZC || !Float.isFinite(f.x) || !Float.isFinite(f.y)){
             // Legacy scalar frames can be from NORMAL/GMR streaming, not a specific SAMPLE request.

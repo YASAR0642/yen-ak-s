@@ -1,0 +1,55 @@
+KTD 3D ANALYZER v3.9.84 — CİHAZ UYUMLULUK NOTLARI
+
+3D ZEMİN TARAMA:
+- CİHAZ: ESP32: standart SAMPLE X=... Y=... ve koordinat doğrulaması korunur.
+- CİHAZ: NANO / DİĞER: cihazdan komut yanıtı beklenmez. ÖRNEK AL'a
+  basıldıktan sonra gelen İLK YENİ Bluetooth ölçümü alınır.
+- İlk basış ortam referansı, sonra her basış bir hücre. Nano cihazı
+  kendiliğinden ölçüm göndermiyorsa fiziksel ölçüm butonuna ayrıca basılır.
+- Koordinatlar telefonda üretilir, Nano tarafından ölçüldüğü iddia edilmez.
+- Veri, SPP Bluetooth bağlantısından satır sonuyla ayrılmış ham 0..1023
+  ADC ölçümü olarak gelmelidir. Örnek: 515\n veya Z=515,C=1.55\n.
+- Sens Pro HEX firmware'inin hangi seri mesajı ürettiği henüz doğrulanmadı.
+  Arduino Nano tek başına Bluetooth içermez; HC-05 veya uyumlu seri
+  Bluetooth köprüsü ve doğru bağlantı/baud ayarı gereklidir.
+- Sadece fiziksel butondan ve hiç seri paket çıkışı yoksa Android
+  uygulaması ölçümü okuyamaz. Bu durumda orijinal firmware/protokol
+  bilinmeden tam uyumluluk garanti edilemez.
+- NORMAL / GMR'de cihaz zaten ölçüm paketleri gönderiyorsa aynı parser
+  kullanılır. Sadece bir düğmeye basınca veri gönderen cihaz canlı sürekli
+  görüntü üretmez, her gönderdiği ölçümde ilerler.
+- CİHAZ modunu yeni çekimden önce değiştirin. Eski kayıtlar korunur.
+
+Yüklenen sens pro(2).hex dosyası AVR ATmega328P makine kodudur.
+İçinde belgelenmiş seri veri protokolü bulunmadığı için format ve
+Bluetooth kontrolü saha testi gerektirir.
+
+Bu çalışma kaynak-kod seviyesindedir; APK ve gerçek Nano donanım testi
+yapılmamıştır.
+
+GELİŞTİRİLMİŞ CIHAZ SECİMİ (3D ekranında CİHAZ düğmesine dokunun):
+- ESP32: mevcut koordinatlı SAMPLE protokolü, orijinal davranış.
+- NANO TELEFON: ÖRNEK AL'a bas, ardından cihazdan gelen ilk yeni
+  seri ölçüm kaydedilir. İlk basış yalnız referanstır.
+- NANO BUTON: yalnız ölçüm butonuyla TEK seri paket gönderen Nano benzeri
+  cihazlar içindir. Her gelen paket bir hücreye yazılır, ilk paket referanstır.
+  700 ms anti-tekrar süresi vardır. SÜREKLİ VERİ AKITAN CİHAZLARDA
+  BU MODU SEÇMEYİN; yoksa sahte hücreler otomatik doldurulur.
+
+NOT: Arduino Nano HEX dosyasının fiziksel tuşa basılınca tam olarak kaç
+seri veri paketi gönderdiği doğrulanmamıştır. Her basışta bir ölçümün
+kararlı kaydı için sahada kontrol gerekir.
+
+3D EKRANINDA ÜÇ CİHAZ SEÇİMİ:
+- ESP32: koordinatlı SAMPLE protokolü (eski ve sağlam yol).
+- NANO TELEFON: ÖRNEK AL'a bas; sonrasında gelen ilk yeni
+  Bluetooth ölçümü kaydedilir. İlk ölçüm yalnız ortam referansıdır.
+- NANO BUTON: SADECE fiziksel düğmeye basınca tek seri ölçüm
+  gönderen cihazlarda kullan. Her gelen ölçüm sıradaki hücreye kaydolur;
+  ilk ölçüm yalnız referans. 700 ms tekrar önleyici aralık vardır.
+  SÜREKLİ VERİ AKIŞI YAPAN CİHAZDA BU MODU SEÇME:
+  sahte ölçümlerle hücreler otomatik dolabilir.
+
+HEX'in düğmeye basıldığında kaç ayrı seri paket gönderdiği doğrulanmadı.
+Birinci basışın yalnız referans, sonraki basışların birer hücre
+oluşturduğu gerçek cihazla ayrıca sınanmalıdır.

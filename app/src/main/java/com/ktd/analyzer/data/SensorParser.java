@@ -29,6 +29,13 @@ public final class SensorParser {
         // Cihaz X/Y göndermiyorsa yalnız Z(sensor),C(yardımcı kanal) paketi de kabul edilir.
         Matcher zc=ZC_LABELED.matcher(s);if(zc.matches()){try{SensorFrame sf=new SensorFrame(Float.NaN,Float.NaN,f(zc.group(1)),f(zc.group(2)));setLegacy(sf,s);return sf;}catch(Exception ignored){}}
 
+        // One-channel serial output from Nano/older devices (no X/Y stamping).
+        // The Android survey mode assigns coordinates only after an explicit sample press.
+        Matcher scalar=Pattern.compile("(?i)^(?:ADC10|ADC|RAW|VALUE|DEGER|DEĞER|Z)\\s*[:=]\\s*"+N+"\\s*$").matcher(s);
+        if(scalar.matches()){
+            try{float v=f(scalar.group(1));if(v>=0f&&v<=1023f)return new SensorFrame(v);}catch(Exception ignored){}
+        }
+
         // Standart cihaz akışı: X,Y,Z,C -> virgülü alan ayırıcı kabul et.
         if(count(s,',')>=3 && s.indexOf(';')<0 && s.indexOf('\t')<0){
             String[] a=s.split(",");if(a.length>=4){try{return new SensorFrame(f(a[0]),f(a[1]),f(a[2]),f(a[3]));}catch(Exception ignored){}}
@@ -43,6 +50,9 @@ public final class SensorParser {
             String[] a=s.split("[;\\t]");if(a.length>=4){try{return new SensorFrame(f(a[0]),f(a[1]),f(a[2]),f(a[3]));}catch(Exception ignored){}}
         }
 
+        // Never treat product banners, status text, counters or diagnostic messages
+        // as sensor data merely because they contain digits.
+        if(s.matches(".*[A-Za-z].*") || s.indexOf('=')>=0 || s.indexOf(':')>=0)return null;
         Matcher m=NUM.matcher(s);List<Float>a=new ArrayList<>();while(m.find()){try{a.add(f(m.group()));}catch(Exception ignored){}}
         if(a.size()>=4)return new SensorFrame(a.get(0),a.get(1),a.get(2),a.get(3));
         // KTD cihazı yalnız Z(sensor),C(yardımcı) yolladığında X/Y uygulamanın gridinden üretilir.
