@@ -66,6 +66,10 @@ public final class BluetoothClient {
         return configuredProtocol==PROTOCOL_STREAM ||
             (configuredProtocol==PROTOCOL_AUTO && observedRawStream && !observedReference);
     }
+    /** Selected AUTO mode (not inferred from the HC-05 advertised name). */
+    public static boolean isAutoProtocol(){ return configuredProtocol==PROTOCOL_AUTO; }
+    /** Explicit REF packets distinguish a command-based ESP32 from a passive Nano stream. */
+    public static boolean hasObservedReference(){ return observedReference; }
     public static String protocolDescription(){
         return isContinuousDataSource()?"Seri veri akışı":configuredProtocol==PROTOCOL_COMMAND?"Komutlu cihaz":"Otomatik algılama";
     }

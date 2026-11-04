@@ -375,8 +375,26 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
             return;
         }
 
-        if(!running||data.full()||!manualSampleRequested)return;
+        if(!running||data.full())return;
         long now=System.currentTimeMillis();
+        // Nano / HC-05: in AUTO mode a physical button may send only a single ADC frame,
+        // without an ESP32 BUTTON_SAMPLE event or a SAMPLE response.  The first frame
+        // was consumed as the baseline above.  Every subsequent *new* scalar frame
+        // can fill the next grid cell without pressing the Android button.
+        // Explicit STREAM mode keeps its original phone-button capture contract.
+        final boolean nanoButtonFrame = BluetoothClient.isAutoProtocol()
+                && !BluetoothClient.hasObservedReference()
+                && !f.referencePacket;
+        if(!manualSampleRequested && nanoButtonFrame){
+            // Suppress duplicates/bounced frame bursts produced by one physical press.
+            if(now-lastCapture<350L)return;
+            manualSampleRequested=true;
+            pendingRequestedAtMs=now;
+            int[] next=cellForIndex(index);
+            pendingXcm=(data.rows-1-next[0])*data.stepCm;
+            pendingYcm=(data.startCorner==1?(data.cols-1-next[1]):next[1])*data.stepCm;
+        }
+        if(!manualSampleRequested)return;
         // A delayed/out-of-order sample must NEVER occupy the next grid cell.
         // Position is in cm in the device protocol; parsed SensorFrame coordinates are metres.
         if(now-pendingRequestedAtMs>6000L){manualSampleRequested=false;return;}
