@@ -54,30 +54,14 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
     private ScanGridContourView gridView;
 
     private boolean running=true,awaitZero=true,manualSampleRequested=false,groundModeArmed=false;
-    private boolean legacyDeviceMode=false; // Nano / generic stream mode: Android owns the grid coordinates.
-    private boolean nanoButtonAutoMode=false; // Only when device emits one frame per hardware press.
-    private long lastNanoTriggerMs=0L;
-    private Button deviceModeBtn;
     private boolean showValue=false,showDepth=false;
     private SensorFrame lastFrame,replayToIgnore;
-    private long lastCapture=0,linePauseUntil=0,pendingRequestedAtMs=0;
-    private float pendingXcm=Float.NaN,pendingYcm=Float.NaN;
+    private long lastCapture=0,linePauseUntil=0;
     private int index=0,palette;
     private Button connectionBtn,valueBtn,depthBtn;
     private TextView depthHint;
-    private TextView sensProHint;
     private MagneticDepthEstimator.Result gridDepthResult;
     private int analysisGeneration=0;
-
-    // ESP32 BUTTON_SAMPLE is a trigger, not itself a reading. In Nano mode the
-    // physical button usually sends the measurement frame directly; do not
-    // generate or demand a phone-side SAMPLE request for such a frame.
-    private final BluetoothClient.HardwareSampleListener hardwareSampleListener=()->runOnUiThread(()->{
-        if(!legacyDeviceMode) requestSample();
-        else if(nanoButtonAutoMode && BluetoothClient.isConnected() && !data.full()) {
-            armNanoPacket(); // next real Nano sample fills exactly one cell
-        }
-    });
 
     @Override protected void onCreate(Bundle b){
         super.onCreate(b);
@@ -85,18 +69,6 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
         voice=new VoiceGuide(this);
         voice.setEnabled(Prefs.voiceGuide(this));
         palette=Prefs.palette(this);
-        legacyDeviceMode=getPreferences(MODE_PRIVATE).getBoolean("legacy_device_mode", false);
-        // v3.9.86 migration: previously selected NANO TELEFON required a phone press.
-        // For Sens Pro with a hardware pushbutton, select NANO BUTON on first launch.
-        // The user can still choose NANO TELEFON for continuously streaming devices.
-        boolean nanoPreferenceMigrated=getPreferences(MODE_PRIVATE).getBoolean("nano_button_pref_v2",false);
-        nanoButtonAutoMode=getPreferences(MODE_PRIVATE).getBoolean("nano_button_auto", false);
-        if(legacyDeviceMode && !nanoPreferenceMigrated){
-            nanoButtonAutoMode=true;
-            getPreferences(MODE_PRIVATE).edit()
-                .putBoolean("nano_button_auto",true)
-                .putBoolean("nano_button_pref_v2",true).apply();
-        }
         newData();
         build();
     }
@@ -107,30 +79,21 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
         // O paket yeni taramanın referansı sayılmaz; ilk GERÇEK yeni paket beklenir.
         replayToIgnore=BluetoothClient.lastFrame();
         bt.activate();
-        BluetoothClient.addHardwareSampleListener(hardwareSampleListener);
         updateConnectionButton();
         ensureGroundMode();
     }
-    @Override protected void onResume(){
-        super.onResume();
-        if(data!=null)data.depthCalibrationFactor=1f;
-        if(gridView!=null)gridView.invalidate();
-    }
-    @Override protected void onStop(){BluetoothClient.removeHardwareSampleListener(hardwareSampleListener);bt.release();super.onStop();}
+    @Override protected void onStop(){bt.release();super.onStop();}
     @Override protected void onDestroy(){handler.removeCallbacksAndMessages(null);if(voice!=null)voice.shutdown();super.onDestroy();}
 
     private void newData(){
         data=new ScanData(Prefs.rows(this),Prefs.cols(this));
-        data.depthCalibrationFactor=1f;
         data.stepCm=Prefs.stepCm(this);
         data.startCorner=Prefs.startCorner(this);
         data.serpentine=Prefs.serpentine(this);
-        index=0;running=true;ref.clear();lastFrame=null;awaitZero=true;manualSampleRequested=false;groundModeArmed=false;lastNanoTriggerMs=0L;linePauseUntil=0;lastCapture=0;pendingRequestedAtMs=0;pendingXcm=Float.NaN;pendingYcm=Float.NaN;
+        index=0;running=true;ref.clear();lastFrame=null;awaitZero=true;manualSampleRequested=false;groundModeArmed=false;linePauseUntil=0;lastCapture=0;
         analysisGeneration++;gridDepthResult=null;
         ScanSessionStore.current=data;
     }
-
-    private boolean smoothMap=true;
 
     private void build(){
         LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(Color.rgb(7,16,24));root.setPadding(Ui.dp(this,10),Ui.dp(this,6),Ui.dp(this,10),Ui.dp(this,8));
@@ -143,55 +106,24 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
         LinearLayout toggles=new LinearLayout(this);toggles.setGravity(Gravity.CENTER);toggles.setPadding(0,Ui.dp(this,3),0,Ui.dp(this,5));
         connectionBtn=Ui.button(this,"BLUETOOTH",false);connectionBtn.setOnClickListener(v->{if(BluetoothClient.isConnected())Toast.makeText(this,"Bağlı: "+BluetoothClient.connectedName(),Toast.LENGTH_SHORT).show();else bt.pickPaired(this);});
         valueBtn=Ui.button(this,"DEĞER",false);valueBtn.setOnClickListener(v->{showValue=!showValue;if(showValue)showDepth=false;applyOverlayMode();});
-        depthBtn=Ui.button(this,"DERİNLİK",false);
-        depthBtn.setOnClickListener(v->{
+        depthBtn=Ui.button(this,"DERİNLİK",false);depthBtn.setOnClickListener(v->{
             showDepth=!showDepth;
             if(showDepth){showValue=false;}
             applyOverlayMode();
         });
         toggles.addView(connectionBtn,toggleLp());toggles.addView(valueBtn,toggleLp());toggles.addView(depthBtn,toggleLp());root.addView(toggles,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,48)));
 
-        // The mode is explicit: never silently assign untagged stream packets to ESP32 cells.
-        deviceModeBtn=Ui.button(this,deviceModeLabel(),false);
-        deviceModeBtn.setOnClickListener(v->{
-            if(data.count>0 || ref.hasReference()){
-                Toast.makeText(this,"Cihaz değiştirmek için önce Yeni Tarama seçin",Toast.LENGTH_LONG).show();return;
-            }
-            // Cycle: ESP32 -> NANO BUTON -> NANO TELEFON -> ESP32.
-            // Hardware button mode requires one new sensor frame per physical press.
-            if(!legacyDeviceMode){legacyDeviceMode=true;nanoButtonAutoMode=true;}
-            else if(nanoButtonAutoMode){nanoButtonAutoMode=false;}
-            else{legacyDeviceMode=false;nanoButtonAutoMode=false;}
-            getPreferences(MODE_PRIVATE).edit()
-                .putBoolean("legacy_device_mode",legacyDeviceMode)
-                .putBoolean("nano_button_auto",nanoButtonAutoMode)
-                .putBoolean("nano_button_pref_v2",true).apply();
-            deviceModeBtn.setText(deviceModeLabel());
-            if(legacyDeviceMode){
-                Toast.makeText(this,nanoButtonAutoMode
-                    ? "NANO BUTON: İlk fiziksel basış referans, sonraki basışlar tek tek hücre kaydı"
-                    : "NANO TELEFON: Önce ekrandan ÖRNEK AL, ardından cihazdan veri",
-                    Toast.LENGTH_LONG).show();
-            }
-            manualSampleRequested=false;pendingRequestedAtMs=0;groundModeArmed=false;
-            if(!legacyDeviceMode)ensureGroundMode();
-        });
-        root.addView(deviceModeBtn,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,39)));
-
         // Kullanıcı isteği: 2D kareleri dışında açıklama satırı yok.
         depthHint=null;
-        sensProHint=null; // Nano ADC10 test paneli kullanıcı arayüzünden kaldırıldı.
 
         LinearLayout topActions=new LinearLayout(this);topActions.setGravity(Gravity.CENTER_VERTICAL);topActions.setPadding(Ui.dp(this,2),Ui.dp(this,2),Ui.dp(this,2),Ui.dp(this,5));
         addTopAction(topActions,"Izgara",false,v->gridDialog());
         addTopAction(topActions,"Yeni Tarama",false,v->resetScan());
         addTopAction(topActions,"3D / 4D",false,v->{ScanSessionStore.current=data;startActivity(new Intent(this,AnalysisActivity.class));});
         root.addView(topActions,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,58)));
-        // 2D yalnız yumuşak harita: kare görünüm düğmesi ve 2D ANALİZ ET kaldırıldı.
-        smoothMap=true;
 
         FrameLayout host=new FrameLayout(this);
-        gridView=new ScanGridContourView(this);gridView.setSmoothMap(true);gridView.setData(data);gridView.setPalette(palette);gridView.setTraversal(Prefs.startCorner(this),Prefs.serpentine(this));setActiveCell();
+        gridView=new ScanGridContourView(this);gridView.setData(data);gridView.setPalette(palette);gridView.setTraversal(Prefs.startCorner(this),Prefs.serpentine(this));setActiveCell();
         host.addView(gridView,new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT,FrameLayout.LayoutParams.MATCH_PARENT));
         root.addView(host,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,0,1));
 
@@ -206,11 +138,6 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
         root.addView(bottomActions,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,58)));
 
         setContentView(root);Ui.applySafeInsets(this,root);applyOverlayMode();updateConnectionButton();
-    }
-
-    private String deviceModeLabel(){
-        return !legacyDeviceMode?"CİHAZ: ESP32":
-               nanoButtonAutoMode?"CİHAZ: NANO BUTON":"CİHAZ: NANO TELEFON";
     }
 
     private LinearLayout.LayoutParams toggleLp(){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,Ui.dp(this,42),1);p.setMargins(Ui.dp(this,3),0,Ui.dp(this,3),0);return p;}
@@ -341,14 +268,14 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
      * komutuyla gelir.
      */
     private void ensureGroundMode(){
-        if(legacyDeviceMode || groundModeArmed || !BluetoothClient.isConnected())return;
+        if(groundModeArmed || !BluetoothClient.isConnected())return;
         if(bt.send("GROUND_START\n"))groundModeArmed=true;
     }
 
     /** SIFIRLA yeni bir çekimdir: eski referans ve hücreler KESİNLİKLE karışmaz. */
     private void zeroNow(){
         if(!beginFreshScan())return;
-        if(BluetoothClient.isConnected()&&!legacyDeviceMode)bt.send("REF\n");
+        if(BluetoothClient.isConnected())bt.send("REF\n");
         Toast.makeText(this,"Yeni çekim • yeni ortam referansı bekleniyor",Toast.LENGTH_SHORT).show();
     }
 
@@ -359,82 +286,24 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
     private void requestSample(){
         if(!BluetoothClient.isConnected()){Toast.makeText(this,"Bluetooth bağlantısı yok",Toast.LENGTH_SHORT).show();bt.pickPaired(this);return;}
         if(data.full()){Toast.makeText(this,"Tarama tamamlandı. Yeni Tarama seçin.",Toast.LENGTH_SHORT).show();return;}
-        if(manualSampleRequested){
-            if(System.currentTimeMillis()-pendingRequestedAtMs<6000L){
-                Toast.makeText(this,"Önceki örnek yanıtı bekleniyor",Toast.LENGTH_SHORT).show();return;
-            }
-            manualSampleRequested=false; // timed out: allow one new request
-        }
         int[] q=cellForIndex(index);
         if(q[0]<0||q[1]<0)return;
         // Uygulamanın kanonik koordinatı: X daima ileri yön, Y yan sıra yönüdür.
         float xCoord=(data.rows-1-q[0])*data.stepCm/100f;
         float yCoord=(data.startCorner==1?(data.cols-1-q[1]):q[1])*data.stepCm/100f;
         manualSampleRequested=true;
-        pendingRequestedAtMs=System.currentTimeMillis();pendingXcm=xCoord*100f;pendingYcm=yCoord*100f;
-        if(legacyDeviceMode){
-            // Do not command an unknown Nano firmware. Wait for its NEXT genuine packet;
-            // the first button press captures reference, then one packet per grid cell.
-            return;
-        }
-        String cmd=String.format(Locale.US,"SAMPLE X=%.0f Y=%.0f\n",xCoord*100f,yCoord*100f);
+        String cmd=String.format(Locale.US,"SAMPLE X=%.2f Y=%.2f\n",xCoord,yCoord);
         boolean sent=bt.send(cmd);
-        if(!sent){manualSampleRequested=false;pendingRequestedAtMs=0;}
-        if(!sent)Toast.makeText(this,"Örnek komutu gönderilemedi",Toast.LENGTH_SHORT).show();
-    }
-
-    /** Nano Sens Pro: coordinate-free physical button packet -> next 3D grid cell.
-     * The Nano A1/A2 ADC is sampled by its firmware, not by ADS1115 or Android.
-     * This method does not send commands or synthesize data. */
-    private boolean armNanoPacket(){
-        if(!legacyDeviceMode || !nanoButtonAutoMode || !running || data.full())return false;
-        if(manualSampleRequested) return true; // existing pending phone/button request
-        long now=System.currentTimeMillis();
-        if(now-lastNanoTriggerMs<180L)return false; // contact bounce
-        int[] q=cellForIndex(index);
-        if(q[0]<0||q[1]<0)return false;
-        manualSampleRequested=true;
-        pendingRequestedAtMs=now;
-        pendingXcm=(data.rows-1-q[0])*data.stepCm;
-        pendingYcm=(data.startCorner==1?(data.cols-1-q[1]):q[1])*data.stepCm;
-        lastNanoTriggerMs=now;
-        return true;
+        if(!sent)manualSampleRequested=false;
+        Toast.makeText(this,sent?"Tek örnek istendi":"Örnek komutu gönderilemedi",Toast.LENGTH_SHORT).show();
     }
 
     @Override public void onFrame(SensorFrame f){runOnUiThread(()->consume(f));}
     private void consume(SensorFrame f){
         if(f==null)return;
-        // Never use a replayed frame as an initial reference or as a new Nano sample.
+        // onStart'taki global son-paket tekrarı referans veya örnek değildir.
         if(replayToIgnore!=null&&f==replayToIgnore){replayToIgnore=null;return;}
         replayToIgnore=null;
-        // NANO BUTON: the hardware press emits its own fresh ADC measurement.
-        // Android itself arms/stamps each cell; the phone button is NOT required.
-        // Never choose this mode for continuous sensor streams: their frames are
-        // indistinguishable from physical press events without firmware markers.
-        if(legacyDeviceMode && nanoButtonAutoMode && !f.referencePacket &&
-           !manualSampleRequested && Float.isFinite(f.signal()) &&
-           f.signal()>=0f && f.signal()<=1023f){
-            // Old working APK's receiver treats a fresh serial data frame as
-            // a measurement. Reuse that packet-driven path for Nano BUTTON:
-            // no prerequisite press on the Android screen.
-            armNanoPacket();
-        }
-        // Reference packet is a native ESP32 concept, not an untagged legacy frame.
-        // The Nano firmware may produce continuous scalar values or one per hardware press.
-        // We accept exactly the FIRST NEW frame after the user has pressed ORNEK AL.
-        if(legacyDeviceMode && manualSampleRequested && !f.referencePacket){
-            float raw=coerceRawSignal(f.signal());
-            if(Float.isFinite(raw) && raw>1f && raw<1023f){
-                if(awaitZero || !ref.hasReference()){
-                    manualSampleRequested=false; pendingRequestedAtMs=0;
-                    acceptReference(raw);
-                    return;
-                }
-                // Stamp the current Android cell into this legacy frame.  X/Y stay
-                // consistent with the existing ESP32 grid protocol (centimetres).
-                f=new SensorFrame(pendingXcm,pendingYcm,raw,Float.NaN);
-            }
-        }
 
         if(f.referencePacket){
             float newRef=coerceRawSignal(f.signal());
@@ -455,42 +324,26 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
         float signal=f.signal();
         float rawSignal=coerceRawSignal(signal);
         if(Float.isNaN(rawSignal))return;
-        SensorFrame frame=f.hasXYZC?new SensorFrame(f.x/100f,f.y/100f,rawSignal,f.c):new SensorFrame(rawSignal);
+        SensorFrame frame=f.hasXYZC?new SensorFrame(f.x,f.y,rawSignal,f.c):new SensorFrame(rawSignal);
         lastFrame=frame;
 
         // İlk yeni sinyal ve her manuel SIFIRLA sonrası ilk yeni sinyal yalnız referanstır; gride yazılmaz.
-        // Reference is only taken by the FIRST explicit SAMPLE button response (REF:512).
-        if(awaitZero||!ref.hasReference())return;
-
-        if(!running||data.full()||!manualSampleRequested)return;
-        long now=System.currentTimeMillis();
-        // A delayed/out-of-order sample must NEVER occupy the next grid cell.
-        // Positions are centimetres in the native protocol and Android legacy stamping.
-        if(now-pendingRequestedAtMs>6000L){manualSampleRequested=false;return;}
-        if(!f.hasXYZC || !Float.isFinite(f.x) || !Float.isFinite(f.y)){
-            // Legacy scalar frames can be from NORMAL/GMR streaming, not a specific SAMPLE request.
-            // Manual survey requires a coordinate-stamped response to prevent wrong-cell writes.
-            Toast.makeText(this,"Koordinatsız veri reddedildi; ESP32 SAMPLE paketini kontrol edin",Toast.LENGTH_SHORT).show();
-            manualSampleRequested=false;return;
-        }
-        if(Math.abs(f.x-pendingXcm)>1.5f || Math.abs(f.y-pendingYcm)>1.5f){
-            // Keep the pending request: its matching reply may still be in transit.
+        if(awaitZero||!ref.hasReference()){
+            acceptReference(rawSignal);
             return;
         }
-        if(data.filled[cellForIndex(index)[0]][cellForIndex(index)[1]])return;
-        // Manual mode: button is the only trigger; do not skip user-requested samples
-        // on automatic line/voice delays.
-        // if(now<linePauseUntil)return;
+
+        if(!running||data.full())return;
+        long now=System.currentTimeMillis();
+        if(now<linePauseUntil)return;
         int interval=Prefs.voiceGuide(this)?Math.max(650,Prefs.intervalMs(this)):Math.max(250,Prefs.intervalMs(this));
         boolean force=manualSampleRequested;
         boolean firstGridSample=index==0;
         if(!force&&!firstGridSample&&now-lastCapture<interval)return;
 
-        manualSampleRequested=false;pendingRequestedAtMs=0;lastCapture=now;
+        manualSampleRequested=false;lastCapture=now;
         int[] q=cellForIndex(index);int line=index/data.rows,point=index%data.rows;
         data.put(q[0],q[1],frame,ref.visualDelta(rawSignal));
-        // C = 800/Z is a derived signal index, not measured metres.
-        if(Float.isFinite(rawSignal)&&rawSignal>0f){data.c[q[0]][q[1]]=com.ktd.analyzer.data.InverseSignalIndex.fromRaw(rawSignal);data.depth[q[0]][q[1]]=Float.NaN;data.cIsDerivedFromRaw=true;data.derivedCDivisor=800;}
         NeutralExperimentalDepth.apply(data);
         index++;
         analysisGeneration++;gridDepthResult=null;
@@ -522,9 +375,9 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
         }
         ref.zero(raw);data.reference=raw;awaitZero=false;
         voice.setEnabled(Prefs.voiceGuide(this));voice.say("Yeni çekim ortam referansı alındı.");
-        // 3D zemin tarama NEVER calls LIVE_START: first manual SAMPLE is only REF.
-        // Subsequent SAMPLE commands receive exactly one new measurement.
-        manualSampleRequested=false;pendingRequestedAtMs=0;
+        if(BluetoothClient.isConnected()){
+            bt.send("RATE=20\n");bt.send("LIVE_START\n");
+        }
         lastCapture=0;
         applyOverlayMode();
     }

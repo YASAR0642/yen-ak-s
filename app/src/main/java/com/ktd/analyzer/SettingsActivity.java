@@ -24,17 +24,18 @@ public final class SettingsActivity extends Activity {
         LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setPadding(Ui.dp(this,14),Ui.dp(this,8),Ui.dp(this,14),Ui.dp(this,14));root.setBackgroundColor(Color.rgb(7,16,24));
         LinearLayout top=new LinearLayout(this);top.setGravity(Gravity.CENTER_VERTICAL);top.addView(Ui.title(this,"KTD 3D ANALYZER"),new LinearLayout.LayoutParams(0,Ui.dp(this,50),1));Button back=Ui.button(this,"‹",false);back.setOnClickListener(v->finish());top.addView(back,new LinearLayout.LayoutParams(Ui.dp(this,56),Ui.dp(this,40)));root.addView(top);
         ScrollView sv=new ScrollView(this);LinearLayout body=new LinearLayout(this);body.setOrientation(LinearLayout.VERTICAL);
-        String[] n={"GÖRÜNÜM","IZGARA","SESLİ YÖNLENDİRME","PROFESYONEL KULLANIM KILAVUZU"};
-        String[] d={"3D/4D • saydam doğal zemin • keskin anomaliler","X/Y hücre • adım • başlangıç yönü","Türkçe sıra ve hücre uyarıları","Cihaz hazırlığı, tarama, verileri okuma ve raporlama"};
+        String[] n={"GÖRÜNÜM","IZGARA","SESLİ YÖNLENDİRME"};
+        String[] d={"3D/4D • saydam doğal zemin • keskin anomaliler","X/Y hücre • adım • başlangıç yönü","Türkçe sıra ve hücre uyarıları"};
         for(int i=0;i<n.length;i++){
             LinearLayout card=new LinearLayout(this);card.setOrientation(LinearLayout.VERTICAL);card.setPadding(Ui.dp(this,18),Ui.dp(this,15),Ui.dp(this,18),Ui.dp(this,15));card.setBackground(Ui.bg(Color.rgb(16,29,39),14,this));
             TextView a=Ui.text(this,n[i],19,Color.WHITE);a.setTypeface(null,1);Ui.fitText(a,15,20,1);
             TextView s=Ui.text(this,d[i],13,Color.rgb(150,176,193));s.setSingleLine(false);Ui.fitText(s,11,14,2);
             card.addView(a,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,34)));
             card.addView(s,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,0,1));
-            final int k=i;card.setOnClickListener(v->{if(k==0)viewDialog();else if(k==1)gridDialog();else if(k==2)voiceDialog();else if(k==3)startActivity(new android.content.Intent(this,UserGuideActivity.class));});
+            final int k=i;card.setOnClickListener(v->{if(k==0)viewDialog();else if(k==1)gridDialog();else voiceDialog();});
             LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,104));cp.setMargins(0,Ui.dp(this,6),0,Ui.dp(this,6));body.addView(card,cp);
         }
+        TextView note=Ui.text(this,"Izgara alan ölçüsü X/Y/adım seçiminden otomatik hesaplanır ve seçim ekranında ayrıca gösterilmez. Kayıt adı çekim ekranında kullanıcı tarafından verilir.",12,Color.rgb(125,151,168));note.setPadding(Ui.dp(this,8),Ui.dp(this,16),Ui.dp(this,8),Ui.dp(this,12));body.addView(note);
         sv.addView(body);root.addView(sv,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,0,1));setContentView(root);Ui.applySafeInsets(this,root);
     }
 

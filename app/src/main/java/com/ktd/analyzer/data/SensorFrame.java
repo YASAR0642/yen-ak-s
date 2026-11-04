@@ -2,8 +2,6 @@ package com.ktd.analyzer.data;
 
 public final class SensorFrame {
     public final float x,y,z,c;
-    /** Optional 10-bit Nano-compatible voltage ADC, not gradiometer signal or depth. */
-    public int legacyAdc10=-1;
     public final float value;
     public final boolean hasXYZC;
     /** Explicit REF:NNN packet starts a NEW scan, never a grid measurement. */

@@ -17,18 +17,13 @@ import java.util.Locale;
 public final class GprRadargramView extends View {
     public static final int FILTER_NONE=0, FILTER_DC=1, FILTER_BACKGROUND=2, FILTER_VERTICAL=3;
     public static final int PALETTE_GRAY=0, PALETTE_DIVERGING=1, PALETTE_SEPIA=2;
-    private static final int MAX_TRACES=180; // Bounded rolling display; acquisition has no trace-count limit
-    private static final int VISIBLE_TRACES=180; // Fixed-width rolling radargram, new traces enter at right
-    private static final double USER_GPR_DEPTH_DISPLAY_SCALE=10000.0; // Requested display scale only, NOT a measured physical calibration
+    private static final int MAX_TRACES=512;
     private final ArrayDeque<GprProtocol.Trace> traces=new ArrayDeque<>();
     private final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint label=new Paint(Paint.ANTI_ALIAS_FLAG);
     private int nSamples=0, maxAbsolute=100, filterMode=0, palette=0;
     private double dtNs=Double.NaN, dxMeters=Double.NaN, epsilonR=9, timeWindowNs=Double.NaN;
     private float gain=1f;
-    private final float[] depthGains={1f,1f,1f,1f};
-    private int antennaMhz=300;
-    private boolean estimatedTime=false;
     private boolean demo=false, hyperbolicContrast=false, autoContrast=true;
     private long lastSequence=-1;
 
@@ -40,12 +35,8 @@ public final class GprRadargramView extends View {
     }
     public void clear(){traces.clear();nSamples=0;lastSequence=-1;invalidate();}
     public void resetSession(){clear();dtNs=Double.NaN;dxMeters=Double.NaN;demo=false;maxAbsolute=100;invalidate();}
-    public void setGain(float value){gain=Math.max(0f,Math.min(10f,value));invalidate();}
+    public void setGain(float value){gain=Math.max(.2f,Math.min(6f,value));invalidate();}
     public float getGain(){return gain;}
-    public void setDepthGain(int section,float value){if(section>=0&&section<4){depthGains[section]=Math.max(0f,Math.min(10f,value));invalidate();}}
-    public float getDepthGain(int section){return depthGains[Math.max(0,Math.min(3,section))];}
-    public void setAntennaMhz(int mhz){antennaMhz=mhz;invalidate();}
-    public void setEstimatedTime(boolean value){estimatedTime=value;invalidate();}
     public void setEpsilon(double value){epsilonR=Math.max(1,Math.min(50,value));invalidate();}
     public double getEpsilon(){return epsilonR;}
     public void setFilterMode(int f){filterMode=Math.max(0,Math.min(3,f));invalidate();}
@@ -118,11 +109,10 @@ public final class GprRadargramView extends View {
         canvas.drawColor(Color.rgb(2,7,10));
         int w=getWidth(),h=getHeight();
         float dp=getResources().getDisplayMetrics().density;
-        int left=(int)(52*dp),right=(int)(68*dp),top=(int)(28*dp),bottom=(int)(8*dp);
+        int left=(int)(46*dp),right=(int)(44*dp),top=(int)(28*dp),bottom=(int)(17*dp);
         int ww=Math.max(1,w-left-right),hh=Math.max(1,h-top-bottom);
         p.setStyle(Paint.Style.FILL);p.setColor(Color.BLACK);canvas.drawRect(left,top,left+ww,top+hh,p);
         List<GprProtocol.Trace> items=snapshot();
-        if(items.size()>VISIBLE_TRACES)items=items.subList(items.size()-VISIBLE_TRACES,items.size());
         int visibleN=items.size();
         int visibleSamples=nSamples;
         if(hasTimeAxis()&&Double.isFinite(timeWindowNs))
@@ -139,61 +129,56 @@ public final class GprRadargramView extends View {
                 peak=Math.max(8,hist[(int)((hist.length-1)*.96)]);
             }
             int[] pixels=new int[visibleN*rows];
-            double scale=Math.max(1,peak)/Math.max(.0001f,gain);
+            double scale=Math.max(1,peak)/gain;
             for(int x=0;x<visibleN;x++)for(int y=0;y<rows;y++){
                 double a=sampled[x][y];
                 if(hyperbolicContrast){
                     double a0=sampled[Math.max(0,x-1)][y],a1=sampled[Math.min(visibleN-1,x+1)][y];
                     a+=(a-(a0+a1)*.5)*.48;
                 }
-                int section=Math.min(3,(int)((long)y*4/rows));
-                float localGain=depthGains[section];
-                double response=a/scale*localGain;
-                pixels[y*visibleN+x]=(gain<=0.0001f || localGain<=0.0001f ? Color.rgb(128,128,128) : shade(response));
+                pixels[y*visibleN+x]=shade(a/scale);
             }
             Bitmap bmp=Bitmap.createBitmap(pixels,visibleN,rows,Bitmap.Config.ARGB_8888);
             p.setFilterBitmap(true);p.setStyle(Paint.Style.FILL);
-            // Preserve a fixed x-step; leave unfilled space black and scroll left after 180 traces.
-            int drawnW=Math.max(1,Math.round(ww*(visibleN/(float)VISIBLE_TRACES)));
-            canvas.drawBitmap(bmp,new Rect(0,0,visibleN,rows),new Rect(left,top,left+drawnW,top+hh),p);
+            canvas.drawBitmap(bmp,new Rect(0,0,visibleN,rows),new Rect(left,top,left+ww,top+hh),p);
             bmp.recycle();
         }
         p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(dp*.65f);p.setColor(Color.rgb(85,111,125));
         canvas.drawRect(left,top,left+ww,top+hh,p);
-        // PC-style right-hand MT* scale. An unknown SGY sample interval is NOT
-        // silently treated as measured time; its display fallback is explicitly starred.
-        boolean measuredNs=hasTimeAxis();
-        double visibleTimeNs=measuredNs ? (visibleSamples-1)*dtNs : Double.NaN;
-        if(!Double.isFinite(visibleTimeNs) || visibleTimeNs<=0)
-            visibleTimeNs=(Double.isFinite(timeWindowNs)&&timeWindowNs>0)?timeWindowNs:150.0;
-        // PC screenshot scale: 150 ns -> approximately 10 m (epsilon_r ~5.05).
-        // This fallback is a display reference only, never a claim of measured depth.
-        double displayEpsilon=measuredNs?epsilonR:5.05;
-        double maxDepth=0.299792458*visibleTimeNs/(2.0*Math.sqrt(displayEpsilon));
-        float axisX=left+ww;
-        p.setStyle(Paint.Style.FILL);p.setColor(Color.BLACK);
-        canvas.drawRect(axisX+1,top-4*dp,w,top+hh+2*dp,p);
-        label.setTextAlign(Paint.Align.CENTER);label.setColor(Color.rgb(118,234,229));
-        canvas.drawText(measuredNs ? "MT" : "MT*",axisX+right*.5f,top-9*dp,label);
-        final int steps=12;
-        for(int i=0;i<=steps;i++){
-            float y=top+hh*i/(float)steps;
-            p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(dp*.55f);
-            p.setColor(Color.argb(45,190,215,235));
-            canvas.drawLine(left,y,axisX,y,p);
-            p.setColor(Color.rgb(61,83,96));canvas.drawLine(axisX+1,y,w,y,p);
-            label.setTextAlign(Paint.Align.RIGHT);label.setColor(Color.rgb(205,224,238));
-            canvas.drawText(String.format(Locale.US,"%.2f",maxDepth*i/steps),w-3*dp,y+(i==0?10*dp:i==steps?-2*dp:4*dp),label);
-            // Keep the sample index left-side as a navigation aid, separate from metres.
-            int index=(int)Math.round((visibleSamples-1)*i/(double)steps);
+        for(int i=0;i<=8;i++){
+            float y=top+hh*i/8f;
+            p.setColor(Color.argb(70,190,215,235));canvas.drawLine(left,y,left+ww,y,p);
+            int index=(int)Math.round((visibleSamples-1)*i/8.0);
+            String t=hasTimeAxis()?String.format(Locale.US,"%.1f",index*dtNs):Integer.toString(index);
             label.setTextAlign(Paint.Align.RIGHT);label.setColor(Color.rgb(194,219,235));
-            canvas.drawText(Integer.toString(index),left-5*dp,y+(i==0?10*dp:i==steps?-2*dp:4*dp),label);
+            canvas.drawText(t,left-4*dp,y+4*dp,label);
+            if(hasTimeAxis()){
+                double dep=GprProtocol.depthMeters(index,dtNs,epsilonR,0);
+                if(Double.isFinite(dep)){
+                    label.setTextAlign(Paint.Align.LEFT);
+                    canvas.drawText(String.format(Locale.US,"%.2f",dep),left+ww+5*dp,y+4*dp,label);
+                }
+            }
         }
-        for(int x=1;x<8;x++){
-            float cx=left+x*ww/8f;
-            p.setColor(Color.argb(65,145,168,183));
-            canvas.drawLine(cx,top,cx,top+hh,p);
+        label.setTextAlign(Paint.Align.RIGHT);
+        label.setColor(Color.rgb(115,201,240));
+        canvas.drawText(hasTimeAxis()?"ns":"ÖRNEK",left-5*dp,top-9*dp,label);
+        if(hasTimeAxis()){
+            label.setTextAlign(Paint.Align.LEFT);
+            canvas.drawText("m*",left+ww+5*dp,top-9*dp,label);
         }
-
+        int maxTags=10;
+        label.setTextAlign(Paint.Align.CENTER);
+        label.setColor(Color.rgb(210,224,232));
+        for(int x=0;x<maxTags;x++){
+            float pos=(x+.5f)/maxTags;
+            float cx=left+pos*ww;
+            long seq=visibleN==0?0:items.get(Math.min(visibleN-1,Math.round((visibleN-1)*pos))).sequence;
+            canvas.drawText(visibleN>0?"İz "+seq:"—",cx,top-7*dp,label);
+            if(x>0){p.setColor(Color.argb(65,145,168,183));canvas.drawLine(cx-ww/maxTags/2f,top,cx-ww/maxTags/2f,top+hh,p);}
+        }
+        label.setTextAlign(Paint.Align.LEFT);label.setColor(Color.rgb(150,187,202));
+        String dx=(Double.isFinite(dxMeters)&&dxMeters>0)?String.format(Locale.US,"%.2f m",Math.max(0,visibleN-1)*dxMeters):"İz "+visibleN;
+        canvas.drawText(dx,left+5*dp,h-3*dp,label);
     }
 }

@@ -91,8 +91,6 @@ public final class ScanData {
     public int suspectedFilledSamples=0;
     public final boolean[][] filled;
     public float reference=Float.NaN;
-    /** Sadece gradyometre ters oranti ekrani, CSV ve gercek C dokunulmaz. */
-    public float depthCalibrationFactor=1f;
     /** true when X,Y,Z,C lacked the exact REF and it was reconstructed statistically. */
     public boolean referenceEstimated=false;
     public int stepCm=30;

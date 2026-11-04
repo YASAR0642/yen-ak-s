@@ -8,8 +8,8 @@ android {
         applicationId 'com.ktd.analyzer'
         minSdk 23
         targetSdk 35
-        versionCode 3988
-        versionName '3.9.88-nano-derleme-duzeltme' 
+        versionCode 396
+        versionName '3.9.6-landscape-gpr'
     }
 
     buildTypes {

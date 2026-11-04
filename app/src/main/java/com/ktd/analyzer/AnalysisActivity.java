@@ -69,7 +69,6 @@ public final class AnalysisActivity extends Activity {
     private float depthSliceMeters=0f;
     private float volumeLevel=.35f;
     private boolean showing4D=false;
-    private Button autoReport;
     private AxisOverlayView currentAxes;
 
     @Override protected void onCreate(Bundle b){
@@ -82,11 +81,10 @@ public final class AnalysisActivity extends Activity {
             data.serpentine=Prefs.serpentine(this);
         }
         palette=Prefs.palette(this);
-        anomalyGain=3.0f;
+        anomalyGain=Prefs.anomalyGain(this);
         volumeSpread=Prefs.volumeSpread(this);
         volumeLayers=Prefs.volumeLayers(this);
         volumeLevel=Prefs.volumeThreshold(this);
-        data.depthCalibrationFactor=1f;
         NeutralExperimentalDepth.apply(data);
         build();showSurface();
     }
@@ -108,15 +106,8 @@ public final class AnalysisActivity extends Activity {
         mode3Button.setOnClickListener(v->showSurface());mode4Button.setOnClickListener(v->show4D());
         Button settingsButton=Ui.button(this,"GÖRÜNÜM",false);Ui.fitText(settingsButton,10,13,1);
         settingsButton.setOnClickListener(v->showSceneSettings());
-        Button resetView=Ui.button(this,"KAMERA",false);Ui.fitText(resetView,10,13,1);
-        resetView.setOnClickListener(v->{if(volume4d!=null)volume4d.resetCamera();
-            if(surface!=null)showSurface();});
-        modes.addView(mode3Button,Ui.weight(1f));modes.addView(mode4Button,Ui.weight(1f));
-        modes.addView(settingsButton,Ui.weight(.95f));modes.addView(resetView,Ui.weight(.85f));
-        autoReport=Ui.button(this,"ANALİZ ET",true);autoReport.setOnClickListener(v->{ScanSessionStore.current=data;startActivity(new Intent(this,AutoAnalysisActivity.class));});
+        modes.addView(mode3Button,Ui.weight(1f));modes.addView(mode4Button,Ui.weight(1f));modes.addView(settingsButton,Ui.weight(.85f));
         root.addView(modes,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,52)));
-        root.addView(autoReport,new LinearLayout.LayoutParams(-1,Ui.dp(this,42)));
-        autoReport.setVisibility(View.GONE);
         depthHeadline=null;depthDetail=null;
 
         host=new FrameLayout(this);root.addView(host,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,0,1));
@@ -125,8 +116,7 @@ public final class AnalysisActivity extends Activity {
         // Kullanıcı seçilen metre seviyesinde 3D/4D görseli aşağı-yukarı gezdirir.
         levelControls=buildLevelControls();
         root.addView(levelControls,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,56)));
-        // Kazanç en yüksek görünümde sabit; ayrı satır kaldırıldı.
-        setGain(3.0f);
+        root.addView(buildGainControls(),new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,45)));
 
         isoControls=buildIsoControls();isoControls.setVisibility(View.GONE);
         root.addView(isoControls,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,116)));
@@ -136,7 +126,7 @@ public final class AnalysisActivity extends Activity {
         ps.addView(palettes,new HorizontalScrollView.LayoutParams(Ui.dp(this,ColorMaps.COUNT*92),Ui.dp(this,52)));root.addView(ps,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,54)));
 
         LinearLayout actions=new LinearLayout(this);actions.setGravity(Gravity.CENTER);
-        // CSV/V3D açma ve CSV kayıt butonları görüntüleme ekranından kaldırıldı.addBottom(actions,"PAYLAŞ",v->shareDialog());
+        addBottom(actions,"CSV / V3D Aç",v->openCsv());addBottom(actions,"CSV Kaydet",v->saveCsv());addBottom(actions,"PAYLAŞ",v->shareDialog());
         root.addView(actions,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,62)));
 
         setContentView(root);Ui.applySafeInsets(this,root);updateDepthLabel();refreshNeutralInfo();refreshDepthDisplay();
@@ -173,15 +163,14 @@ public final class AnalysisActivity extends Activity {
     private void updateDepthLabel(){
         boolean available=visualData!=null&&visualData.hasDepthData();
         boolean modelReady=hasModelDepth();
-        if(levelSeek!=null)levelSeek.setEnabled(available);
+        if(levelSeek!=null)levelSeek.setEnabled(available || modelReady);
         if(levelLabel==null)return;
-        
         if(!available&&!modelReady){
-            levelLabel.setText("Z: göreli hacim (derinlik yok)");return;
+            levelLabel.setText("Ters ölçek • veri yok");return;
         }
-        if(depthSliceMeters<=0f){levelLabel.setText(available?"Derinlik: Tümü":"Derinlik: Tümü");return;}
+        if(depthSliceMeters<=0f){levelLabel.setText(available?"≈ Derinlik: Tümü":"Model: Tümü");return;}
         levelLabel.setText(String.format(Locale.forLanguageTag("tr-TR"),
-            available?"%.2f m":"%.2f m",depthSliceMeters));
+            available?"≈ %.2f m":"Ön model: %.2f m",depthSliceMeters));
     }
 
     private boolean hasModelDepth(){
@@ -195,8 +184,8 @@ public final class AnalysisActivity extends Activity {
         float m=hasModelDepth()?(float)lastDepthResult.depthMeters:Float.NaN;
         float mx=modelMaxDepth();
         if(surface!=null)surface.setModelDepthMeters(m,mx);
-        if(volume4d!=null)volume4d.setModelDepthMeters(Float.NaN,Float.NaN);
-        if(currentAxes!=null)currentAxes.setModelDepthMeters(Float.NaN,Float.NaN);
+        if(volume4d!=null)volume4d.setModelDepthMeters(m,mx);
+        if(currentAxes!=null)currentAxes.setModelDepthMeters(m,mx);
         updateDepthLabel();
     }
 
@@ -230,7 +219,10 @@ public final class AnalysisActivity extends Activity {
         CheckBox smooth=new CheckBox(this);smooth.setText("3D ve 4D yumuşatma");smooth.setTextColor(Color.WHITE);smooth.setChecked(Prefs.smoothing(this));
         CheckBox grid=new CheckBox(this);grid.setText("3D ızgara / 4D çerçeve");grid.setTextColor(Color.WHITE);grid.setChecked(Prefs.grid(this));
         panel.addView(smooth);panel.addView(grid);
-
+        TextView gainTitle=Ui.text(this,String.format(Locale.US,"Kazanç: %.1fx",anomalyGain),13,Color.WHITE);
+        SeekBar gain=new SeekBar(this);gain.setMax(28);gain.setProgress(Math.round((anomalyGain-.2f)*10f));
+        gain.setOnSeekBarChangeListener(simple(v->gainTitle.setText(String.format(Locale.US,"Kazanç: %.1fx",.2f+v*.1f))));
+        panel.addView(gainTitle);panel.addView(gain);
         TextView opacityTitle=Ui.text(this,String.format(Locale.US,"Doğal zemin görünürlüğü: %d",Math.round(Prefs.groundOpacity(this)*100)),13,Color.WHITE);
         SeekBar opacitySeek=new SeekBar(this);opacitySeek.setMax(33);opacitySeek.setProgress(Math.round((Prefs.groundOpacity(this)-.02f)*100f));
         opacitySeek.setOnSeekBarChangeListener(simple(v->opacityTitle.setText("Doğal zemin görünürlüğü: %"+(v+2))));
@@ -249,7 +241,7 @@ public final class AnalysisActivity extends Activity {
             .setView(scroll).setPositiveButton("Uygula",(d,w)->{
                 Prefs.setView(this,Prefs.heightGain(this),smooth.isChecked(),grid.isChecked());
                 Prefs.setVolumeVisuals(this,.02f+opacitySeek.getProgress()/100f,.70f+sharpSeek.getProgress()/10f);
-                setGain(3.0f);
+                setGain(.2f+gain.getProgress()*.1f);gainSeek.setProgress(gain.getProgress());
                 volumeLayers=layers.getProgress()+1;
                 Prefs.setVolume(this,volumeLayers,volumeSpread,volumeLevel);
                 if(showing4D)show4D();else showSurface();
@@ -293,8 +285,7 @@ public final class AnalysisActivity extends Activity {
     private void showSurface(){
         if(surface!=null)surface.onPause();if(volume4d!=null)volume4d.onPause();
         showing4D=false;
-        if(autoReport!=null)autoReport.setVisibility(View.GONE);
-        visualData=ReferenceInverseDepth.createRelativeIndexVolume(data);
+        visualData=ReferenceInverseDepth.createVisualDepth(data);
         host.removeAllViews();surface=new ProSurfaceGLView(this);surface.setData(visualData);surface.setPalette(palette);surface.setSmoothing(Prefs.smoothing(this));surface.setWireframe(Prefs.grid(this));surface.setDisplayGain(anomalyGain);
         surface.setMode(ProSurfaceGLView.ADVANCED);surface.setDepthSliceMeters(depthSliceMeters);
         host.addView(surface,new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT,FrameLayout.LayoutParams.MATCH_PARENT));
@@ -311,11 +302,10 @@ public final class AnalysisActivity extends Activity {
         }
         if(surface!=null)surface.onPause();if(volume4d!=null)volume4d.onPause();
         showing4D=true;
-        if(autoReport!=null)autoReport.setVisibility(View.VISIBLE);
-        visualData=ReferenceInverseDepth.createRelativeIndexVolume(data);
+        visualData=ReferenceInverseDepth.createVisualDepth(data);
         host.removeAllViews();volume4d=new Volume4DView(this);volume4d.setData(visualData);volume4d.setPalette(palette);
         volume4d.setSmoothing(Prefs.smoothing(this));volume4d.setWireframe(Prefs.grid(this));
-        volume4d.setThreshold(Math.max(.035f,Math.min(.20f,volumeLevel/anomalyGain)));volume4d.setDepthFocusMeters(depthSliceMeters);
+        volume4d.setThreshold(Math.max(.06f,volumeLevel/anomalyGain));volume4d.setDepthFocusMeters(depthSliceMeters);
         volume4d.setSpread(volumeSpread);volume4d.setLayers(volumeLayers);
         volume4d.setOpacity(Prefs.groundOpacity(this));volume4d.setSharpness(Prefs.anomalySharpness(this));
         host.addView(volume4d,new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT,FrameLayout.LayoutParams.MATCH_PARENT));
@@ -502,7 +492,7 @@ public final class AnalysisActivity extends Activity {
     private void refreshNeutralInfo(){
         if(neutralInfo==null||data==null)return;
         String text;
-        if(data.cIsDerivedFromRaw)text="Z derinlik ekseni • 3D anomali";
+        if(data.cIsDerivedFromRaw)text="C = "+data.derivedCDivisor+"/Z turevi • gercek derinlik degil • 3D anomali";
         else if(data.hasDepthData())text="C kanalı mevcut • fiziksel doğruluk teyit edilmeli";
         else text="HAM ANOMALİ • model metreleri doğrulanmamış";
         int verified=data.fieldVerifiedCount();
