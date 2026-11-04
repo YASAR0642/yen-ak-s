@@ -1,61 +1,60 @@
-name: KTD Android APK - Otomatik Derleme
+name: KTD 3D ANALYZER 3.9.68 APK Derle
 
 on:
   workflow_dispatch:
   push:
-    branches: [main]
-    paths:
-      - 'app/**'
-      - 'build.gradle'
-      - 'settings.gradle'
-      - 'gradle.properties'
-      - 'gradle/**'
-      - '.github/workflows/main.yml'
+    branches:
+      - main
 
 permissions:
   contents: read
 
 jobs:
-  apk:
+  android-apk:
+    name: Android Debug APK
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
       - name: Projeyi indir
         uses: actions/checkout@v4
 
-      - name: Java 17
+      - name: Java 17 ayarla
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Android SDK - Hazir runner kullan
+      # Eski Android SDK kurulum adimi artik olmayan "tools" paketini kurmaya
+      # calisabildigi icin GitHub runner'in hazir Android SDK'sini kullan.
+      - name: Android SDK 35 paketlerini hazirla
         shell: bash
         run: |
-          set -euo pipefail
+          set -e
           SDK_DIR="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          SDKMANAGER="$SDK_DIR/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMANAGER" ]; then
+            echo "HATA: sdkmanager bulunamadi: $SDKMANAGER"
+            exit 1
+          fi
           echo "ANDROID_HOME=$SDK_DIR" >> "$GITHUB_ENV"
           echo "ANDROID_SDK_ROOT=$SDK_DIR" >> "$GITHUB_ENV"
-          MANAGER="$SDK_DIR/cmdline-tools/latest/bin/sdkmanager"
-          if [ ! -x "$MANAGER" ]; then echo "sdkmanager bulunamadi: $MANAGER"; exit 1; fi
-          if [ ! -f "$SDK_DIR/platforms/android-35/android.jar" ] || [ ! -d "$SDK_DIR/build-tools/35.0.0" ]; then
-            yes | "$MANAGER" --sdk_root="$SDK_DIR" --licenses >/dev/null || true
-            "$MANAGER" --sdk_root="$SDK_DIR" 'platforms;android-35' 'build-tools;35.0.0'
-          fi
+          printf 'y\n%.0s' {1..30} | "$SDKMANAGER" --sdk_root="$SDK_DIR" --licenses
+          "$SDKMANAGER" --sdk_root="$SDK_DIR" --install \
+            "platforms;android-35" "build-tools;35.0.0" "platform-tools"
 
-      - name: Gradle 8.9
+      - name: Gradle 8.9 ayarla
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
 
-      - name: Derle
+      - name: APK derle
         run: gradle --no-daemon --stacktrace :app:assembleDebug
 
-      - name: APK paketle
+      - name: APK dosyasini yukle
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: KTD-Android-APK-${{ github.run_number }}
+          name: KTD-3D-ANALYZER-v3.9.67-APK
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 30

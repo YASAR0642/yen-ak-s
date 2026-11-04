@@ -8,8 +8,8 @@ android {
         applicationId 'com.ktd.analyzer'
         minSdk 23
         targetSdk 35
-        versionCode 3986
-        versionName '3.9.86-nano-fiziksel-buton' 
+        versionCode 3987
+        versionName '3.9.87-nano-apk-buton-eski-aktivasyon' 
     }
 
     buildTypes {

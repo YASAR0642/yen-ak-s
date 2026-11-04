@@ -1,0 +1,10 @@
+KTD 3D ANALYZER v3.9.87 — GITHUB YUKLEME PAKETI
+
+Bu ZIP dosyasini GitHub deposuna TEK DOSYA olarak yuklemeyin.
+ZIP'i Windows'ta 'Tumunu ayikla' ile acin. Icinde app, .github ve Gradle dosyalari var.
+GitHub Add file > Upload files ekraninda bu ayiklanmis dosyalari ve klasorleri bir defada surukleyin.
+Proje klasorunun kendisini degil, ICINDEKILERI deponun kokune yukleyin.
+GitHub 100 dosyalik web yukleme siniri icin eski surum notlari paketten cikarildi.
+Java kodu, resimler, aktivasyon, Nano uyumluluk ve workflow korunmustur.
+GitHub tarayicisinda 'dosyayi isleyemiyoruz' hatasi devam ederse alternatif GitHub Desktop ile tek commit/push yapin.
+Bu paket yeni bir derleme testi yapildigi anlamina gelmez.

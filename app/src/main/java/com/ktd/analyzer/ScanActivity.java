@@ -47,8 +47,15 @@ import java.util.Locale;
  */
 public final class ScanActivity extends Activity implements BluetoothClient.Listener {
     private BluetoothClient bt;
-    // Same operation as the screen's ORNEK AL button, coordinated on the Android side.
-    private final BluetoothClient.HardwareSampleListener hardwareSampleListener=()->runOnUiThread(()->requestSample());
+    // ESP32 BUTTON_SAMPLE is a trigger, not itself a reading. In Nano mode the
+    // physical button usually sends the measurement frame directly; do not
+    // generate or demand a phone-side SAMPLE request for such a frame.
+    private final BluetoothClient.HardwareSampleListener hardwareSampleListener=()->runOnUiThread(()->{
+        if(!legacyDeviceMode) requestSample();
+        else if(nanoButtonAutoMode && BluetoothClient.isConnected() && !data.full()) {
+            armNanoPacket(); // next real Nano sample fills exactly one cell
+        }
+    });
     private final ReferenceModel ref=new ReferenceModel();
     private final Handler handler=new Handler(Looper.getMainLooper());
     private VoiceGuide voice;
@@ -375,6 +382,24 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
         if(!sent)Toast.makeText(this,"Örnek komutu gönderilemedi",Toast.LENGTH_SHORT).show();
     }
 
+    /** Nano Sens Pro: coordinate-free physical button packet -> next 3D grid cell.
+     * The Nano A1/A2 ADC is sampled by its firmware, not by ADS1115 or Android.
+     * This method does not send commands or synthesize data. */
+    private boolean armNanoPacket(){
+        if(!legacyDeviceMode || !nanoButtonAutoMode || !running || data.full())return false;
+        if(manualSampleRequested) return true; // existing pending phone/button request
+        long now=System.currentTimeMillis();
+        if(now-lastNanoTriggerMs<180L)return false; // contact bounce
+        int[] q=cellForIndex(index);
+        if(q[0]<0||q[1]<0)return false;
+        manualSampleRequested=true;
+        pendingRequestedAtMs=now;
+        pendingXcm=(data.rows-1-q[0])*data.stepCm;
+        pendingYcm=(data.startCorner==1?(data.cols-1-q[1]):q[1])*data.stepCm;
+        lastNanoTriggerMs=now;
+        return true;
+    }
+
     @Override public void onFrame(SensorFrame f){runOnUiThread(()->consume(f));}
     private void consume(SensorFrame f){
         if(f==null)return;
@@ -385,18 +410,13 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
         // Android itself arms/stamps each cell; the phone button is NOT required.
         // Never choose this mode for continuous sensor streams: their frames are
         // indistinguishable from physical press events without firmware markers.
-        if(legacyDeviceMode && nanoButtonAutoMode && !manualSampleRequested &&
-           !f.referencePacket && !data.full() && running){
-            long now=System.currentTimeMillis();
-            if(now-lastNanoTriggerMs>=250L){
-                int[] cell=cellForIndex(index);
-                if(cell[0]>=0&&cell[1]>=0){
-                    manualSampleRequested=true;pendingRequestedAtMs=now;
-                    pendingXcm=(data.rows-1-cell[0])*data.stepCm;
-                    pendingYcm=(data.startCorner==1?(data.cols-1-cell[1]):cell[1])*data.stepCm;
-                    lastNanoTriggerMs=now;
-                }
-            }
+        if(legacyDeviceMode && nanoButtonAutoMode && !f.referencePacket &&
+           !manualSampleRequested && Float.isFinite(f.signal()) &&
+           f.signal()>=0f && f.signal()<=1023f){
+            // Old working APK's receiver treats a fresh serial data frame as
+            // a measurement. Reuse that packet-driven path for Nano BUTTON:
+            // no prerequisite press on the Android screen.
+            armNanoPacket();
         }
         // Reference packet is a native ESP32 concept, not an untagged legacy frame.
         // The Nano firmware may produce continuous scalar values or one per hardware press.
