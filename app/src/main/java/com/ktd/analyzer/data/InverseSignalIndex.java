@@ -1,7 +1,7 @@
 package com.ktd.analyzer.data;
 
 /**
- * Deneysel ters sinyal dönüşümü: C_indeks = 1024 / Z.
+ * Deneysel ters sinyal dönüşümü: C_indeks = 800 / Z.
  *
  * Bu bir fiziksel derinlik denklemi değildir; bilinen bir manyetik kaynak
  * gücü, sensör aktarım fonksiyonu ve doğrulanmış saha kalibrasyonu içermez.
@@ -9,7 +9,7 @@ package com.ktd.analyzer.data;
  * kullanılmaz. CSV'de yalnızca X,Y,Z,C sütunları tutulur.
  */
 public final class InverseSignalIndex {
-    public static final float NUMERATOR=1024f;
+    public static final float NUMERATOR=800f;
     private InverseSignalIndex(){}
     public static float fromRaw(float z){
         if(!Float.isFinite(z)||z<=0f)return Float.NaN;

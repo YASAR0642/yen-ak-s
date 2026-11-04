@@ -39,7 +39,7 @@ public final class Volume4DView extends GLSurfaceView {
     public Volume4DView(Context c){
         super(c);setEGLContextClientVersion(2);setEGLConfigChooser(8,8,8,8,16,0);
         renderer=new Renderer4D();setRenderer(renderer);setRenderMode(RENDERMODE_WHEN_DIRTY);
-        scaler=new ScaleGestureDetector(c,new ScaleGestureDetector.SimpleOnScaleGestureListener(){@Override public boolean onScale(ScaleGestureDetector d){renderer.zoom=clamp(renderer.zoom*d.getScaleFactor(),.48f,3.0f);syncAxes();requestRender();return true;}});
+        scaler=new ScaleGestureDetector(c,new ScaleGestureDetector.SimpleOnScaleGestureListener(){@Override public boolean onScale(ScaleGestureDetector d){renderer.zoom=clamp(renderer.zoom*d.getScaleFactor(),.24f,6.0f);syncAxes();requestRender();return true;}});
     }
     public void setData(ScanData d){renderer.data=d;renderer.dirty=true;if(axisOverlay!=null)axisOverlay.setData(d);requestRender();}
     public void notifyDataChanged(){renderer.dirty=true;requestRender();}
@@ -73,8 +73,8 @@ public final class Volume4DView extends GLSurfaceView {
             if(e.getPointerCount()>=2){
                 float mx=(e.getX(0)+e.getX(1))*.5f,my=(e.getY(0)+e.getY(1))*.5f;
                 float unit=2.8f/Math.max(1f,Math.min(getWidth(),getHeight()));
-                renderer.panX+=(mx-lastMidX)*unit/Math.max(.48f,renderer.zoom);
-                renderer.panY-=(my-lastMidY)*unit/Math.max(.48f,renderer.zoom);
+                renderer.panX+=(mx-lastMidX)*unit/Math.max(.24f,renderer.zoom);
+                renderer.panY-=(my-lastMidY)*unit/Math.max(.24f,renderer.zoom);
                 lastMidX=mx;lastMidY=my;syncAxes();requestRender();return true;
             }
             renderer.yaw=wrap(renderer.yaw+(e.getX()-lastX)*.38f);
@@ -151,7 +151,7 @@ public final class Volume4DView extends GLSurfaceView {
                 float t=n==1?0f:li/(float)(n-1);
                 float level=threshold+(.86f-threshold)*t;
                 // Dış kütle saydam; merkez yoğun ve opak. Güçlü anomali içeride görünür.
-                float a=n==1?1f:(li==n-1?1f:(.42f+.18f*t));
+                float a=1f; // Tam dolu anomali yüzeyleri: dış katmanları da opak çiz.
                 if(posMax>10.5f)out.add(buildIso(dense,d,true,posMax,level,a));
                 if(negMax>10.5f)out.add(buildIso(dense,d,false,negMax,level,a));
             }
@@ -168,8 +168,7 @@ public final class Volume4DView extends GLSurfaceView {
             final int NZ=layers>=5?17:(layers>=3?20:24);
             final float ZMAX=AxisOverlayView.volumeExtentFor(source);
             final boolean realDepth=source.hasDepthData();
-            final boolean modelReady=!realDepth&&Float.isFinite(modelDepthMeters)
-                    &&modelDepthMeters>0f&&Float.isFinite(modelAxisMeters)&&modelAxisMeters>=modelDepthMeters;
+            final boolean modelReady=false; // No unverified model metre on axes
             final float maxDepth=realDepth?Math.max(.05f,source.maxDepthMeters()):
                     modelReady?modelAxisMeters:1f;
             final float spread01=clamp((spread-.60f)/1.00f,0f,1f);
@@ -179,8 +178,9 @@ public final class Volume4DView extends GLSurfaceView {
             // 30 cm gridde yaklaşık 0.13..0.30 m sigma aralığı; küçük XY hedefi
             // derin bir kolona dönüşmez.
             final float stepM=Math.max(.05f,source.stepCm/100f);
-            final float sigmaMeters=Math.max(.10f,stepM*(.45f+.55f*spread01));
-            final float sigmaNorm=clamp(sigmaMeters/maxDepth,.025f,.28f);
+            // Volume thickness in C-index units: depends on index scale, not invented metres.
+            final float sigmaIndex=Math.max(.08f,maxDepth*(.065f+.11f*spread01));
+            final float sigmaNorm=clamp(sigmaIndex/maxDepth,.025f,.28f);
 
             float iso=signMax*levelFrac;
             ArrayList<Float> pos=new ArrayList<>(),norm=new ArrayList<>();
@@ -204,7 +204,7 @@ public final class Volume4DView extends GLSurfaceView {
                     // Gerçek bir C değeri/interpolasyonu yoksa sahte yüzey derinliği üretme.
                     if(!Float.isFinite(depthM)){
                         // Ham anomali verisiyle yalnız göreli hacim çizimi; metre üretmez.
-                        depthM=modelReady?modelDepthMeters:.50f;
+                        depthM=maxDepth*.5f; // No valid C: display centre in C-index coordinates
                     }
                     depthM=clamp(depthM,0f,maxDepth);
                     float centerNorm=clamp(depthM/maxDepth,0f,1f);
@@ -212,7 +212,7 @@ public final class Volume4DView extends GLSurfaceView {
                     float zNorm=clamp((-pz)/Math.max(.001f,ZMAX),0f,1f);
                     float dzNorm=(zNorm-centerNorm)/sigmaNorm;
                     float depthKernel=(float)Math.exp(-.5f*dzNorm*dzNorm);
-                    float focusSigma=Math.max(.22f,Math.min(Math.max(.38f,maxDepth*.18f),Math.max(.30f,sigmaMeters*1.8f)));
+                    float focusSigma=Math.max(.22f,Math.min(Math.max(.38f,maxDepth*.18f),Math.max(.30f,sigmaIndex*1.8f)));
                     float df=(depthM-focusDepth)/focusSigma;
                     float focusKernel=!realDepth&&!modelReady?1f:
                             depthFocusMeters<=0f?1f:(float)Math.exp(-.5f*df*df);
@@ -233,7 +233,7 @@ public final class Volume4DView extends GLSurfaceView {
                 float u=clamp((px+1.12f)/2.24f,0f,1f);
                 float vv=clamp((1.02f-py)/2.04f,0f,1f);
                 float raw=sampleDense(dense,u,vv);
-                int col=ColorMaps.color(palette,raw,colorScale);
+                int col=ColorMaps.color(palette,raw,palette==13?120f:colorScale);
                 colors.add(Color.red(col)/255f);
                 colors.add(Color.green(col)/255f);
                 colors.add(Color.blue(col)/255f);

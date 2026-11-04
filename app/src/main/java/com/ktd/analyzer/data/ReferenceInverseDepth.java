@@ -4,23 +4,16 @@ import java.util.ArrayList;
 import java.util.Collections;
 
 /**
- * V3.8.8 - iki yönlü, zemine göre NORMALİZE ters sinyal cetveli.
- * Bu sonuç µT veya fiziksel hedef uzaklığı ölçümü değildir. Kalibrasyon
- * yapılmadıkça deneysel bir görsel mesafe indeksidir.
- *
- * Referans R her taramanın ilk REF/ÖRNEK AL ölçümünden gelir.
- *   Z > R : s=(Z-R)/(1023-R)
- *   Z < R : s=(R-Z)/R
- *   D=0.50/s [deneysel metre ölçeği]
- *
- * Doğal zemindeki gürültü bandı (|Z-R|<=10) 0 m yüzey kabul edilir;
- * bu, o noktada yeraltı hedefi 0 m'dedir demek değildir.
+ * Ortam referansina gore iki yonlu normalize edilen proje derinlik indeksi.
+ * R = taramanin ilk referansi, delta = hamZ-R.
+ * Z_ref=1023*|delta|/(delta>=0 ? 1023-R : R), proje indeksi=800/Z_ref.
+ * Bu fiziksel derinlik degildir. CSV ham Z/C kayitlari degistirilmez.
  */
 public final class ReferenceInverseDepth {
     private ReferenceInverseDepth(){}
     public static final float ADC_MAX=1023f;
-    public static final float GROUND_BAND=10f;
-    public static final float SATURATION_ASSUMED_METERS=.50f;
+    public static final float GROUND_BAND=ReferenceMeterModel.ANOMALY_THRESHOLD;
+    public static final float SATURATION_ASSUMED_METERS=.05f;
     public static final class Reading {
         public final float meters,relativeStrength;
         public final boolean anomaly,positive,saturated,approxReference;
@@ -44,26 +37,22 @@ public final class ReferenceInverseDepth {
         return vals.get(vals.size()/2);
     }
     public static Reading measure(float raw,float ref){
-        if(!Float.isFinite(raw)||!Float.isFinite(ref)||ref<=0f||ref>=ADC_MAX)
-            return new Reading(Float.NaN,Float.NaN,false,false,false,false);
-        float z=Math.max(0f,Math.min(ADC_MAX,raw));
-        float diff=z-ref;
-        boolean positive=diff>=0f;
-        boolean saturated=z<=1f||z>=1022f;
-        if(Math.abs(diff)<=GROUND_BAND)return new Reading(0f,0f,false,positive,saturated,false);
-        float side=positive?ADC_MAX-ref:ref;
-        if(side<=0f)return new Reading(Float.NaN,Float.NaN,false,positive,saturated,false);
-        float strength=Math.max(0f,Math.min(1f,Math.abs(diff)/side));
-        if(strength<=0f)return new Reading(0f,0f,false,positive,saturated,false);
-        // Üst sınır YOK; sinyal küçüldükçe deneysel ölçek büyür.
-        float meters=SATURATION_ASSUMED_METERS/strength;
-        return new Reading(Float.isFinite(meters)?meters:Float.NaN,strength,true,positive,saturated,false);
+        return measure(raw,ref,1f);
+    }
+    public static Reading measure(float raw,float ref,float calibrationFactor){
+        float z=ReferenceMeterModel.normalizedSignal(raw,ref);
+        if(!Float.isFinite(z))return new Reading(Float.NaN,Float.NaN,false,
+                Float.isFinite(raw)&&Float.isFinite(ref)&&raw>=ref,false,false);
+        float meters=ReferenceMeterModel.NUMERATOR/z;
+        boolean positive=raw>=ref;
+        boolean saturated=raw<=1f||raw>=ADC_MAX-1f;
+        return new Reading(meters,Math.min(1f,z/ADC_MAX),true,positive,saturated,false);
     }
     public static Reading at(ScanData d,int row,int col){
         if(d==null||row<0||col<0||row>=d.rows||col>=d.cols||!d.filled[row][col])
             return new Reading(Float.NaN,Float.NaN,false,false,false,false);
         float ref=referenceOf(d);
-        Reading base=measure(d.raw[row][col],ref);
+        Reading base=measure(d.raw[row][col],ref,d.depthCalibrationFactor);
         if(!d.referenceEstimated)return base;
         return new Reading(base.meters,base.relativeStrength,base.anomaly,base.positive,base.saturated,true);
     }
@@ -72,6 +61,7 @@ public final class ReferenceInverseDepth {
         if(original==null)return null;
         ScanData out=new ScanData(original.rows,original.cols);
         out.reference=referenceOf(original);
+        out.depthCalibrationFactor=original.depthCalibrationFactor;
         out.referenceEstimated=original.referenceEstimated;
         out.stepCm=original.stepCm;out.startCorner=original.startCorner;
         out.serpentine=original.serpentine;out.soilProfile=original.soilProfile;
@@ -89,11 +79,31 @@ public final class ReferenceInverseDepth {
             out.c[r][c]=original.c[r][c];out.delta[r][c]=original.delta[r][c];
             out.fieldVerifiedDepth[r][c]=original.fieldVerifiedDepth[r][c];
             if(!original.filled[r][c])continue;
-            Reading reading=measure(original.raw[r][c],out.reference);
+            Reading reading=measure(original.raw[r][c],out.reference,out.depthCalibrationFactor);
             // Orijinal C'de bağımsız cihaz derinliği varsa ayrı saklanır.
             // Z temelli deneysel görünüm her iki tarafta aynı cetveldir.
             out.depth[r][c]=Float.isFinite(reading.meters)?reading.meters:Float.NaN;
         }
         return out;
     }
+
+    /**
+     * Voxler-like C axis: C = 800 / Z is used in its ORIGINAL numeric
+     * coordinate, without per-scan min/max normalization. Thus two scans
+     * with identical Z values produce identical C positions.
+     * C is a derived magnetic SIGNAL INDEX, NOT a measured depth in metres.
+     */
+    public static ScanData createRelativeIndexVolume(ScanData original){
+        if(original==null)return null;
+        ScanData out=createVisualDepth(original);
+        for(int r=0;r<out.rows;r++)for(int c=0;c<out.cols;c++){
+            float v=ReferenceMeterModel.meters(out.raw[r][c],out.reference);
+            out.depth[r][c]=out.filled[r][c] && Float.isFinite(v) ? v : Float.NaN;
+        }
+        out.cIsDerivedFromRaw=true;
+        out.derivedCDivisor=800;
+        out.rulerDerivedDepth=true;
+        return out;
+    }
+
 }

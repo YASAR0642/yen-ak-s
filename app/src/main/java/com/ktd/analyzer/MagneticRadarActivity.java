@@ -161,7 +161,7 @@ public final class MagneticRadarActivity extends Activity implements BluetoothCl
                 return;
             }
             if(running){
-                if(BluetoothClient.isConnected())bluetooth.send("LIVE_STOP\n");
+                if(BluetoothClient.isConnected()&&!BluetoothClient.isContinuousDataSource())bluetooth.send("LIVE_STOP\n");
                 running=false;getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);radar.setBrowseEnabled(true);showStartButton(false);
                 return;
             }
@@ -169,7 +169,11 @@ public final class MagneticRadarActivity extends Activity implements BluetoothCl
                 Toast.makeText(this,"Bluetooth bağlantısı gerekli",Toast.LENGTH_SHORT).show();return;
             }
             reference.clear();zeroed=false; // Each new live recording takes its own ground reference.
-            bluetooth.send("RATE=100\n");if(!bluetooth.send("LIVE_START\n"))return;running=true;getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);radar.setBrowseEnabled(false);showStartButton(true);
+            if(!BluetoothClient.isContinuousDataSource()){
+                bluetooth.send("RATE=100\n");
+                if(!bluetooth.send("LIVE_START\n"))return;
+            }
+            running=true;getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);radar.setBrowseEnabled(false);showStartButton(true);
         });
         add(controls,startButton);
         Button open=button("DOSYA AÇ");open.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xff265d86));open.setOnClickListener(v->open());add(controls,open);
@@ -208,8 +212,8 @@ public final class MagneticRadarActivity extends Activity implements BluetoothCl
     }
     private void updateStatus(){if(status==null)return;boolean ok=BluetoothClient.isConnected();status.setText(ok?"● BT BAĞLI":"○ BT YOK");status.setBackgroundColor(ok?Color.rgb(23,136,97):Color.rgb(147,56,70));}
     @Override public void onState(String s){runOnUiThread(()->{updateStatus();if(!BluetoothClient.isConnected()){running=false;getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);showStartButton(false);}});}    
-    @Override protected void onStart(){super.onStart();running=false;getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);bluetooth.activate();if(BluetoothClient.isConnected())bluetooth.send("LIVE_STOP\n");updateStatus();showStartButton(false);radar.setBrowseEnabled(true);}
-    @Override protected void onStop(){perfMonitor.stop();playingFile=false;playbackHandler.removeCallbacks(playTick);if(BluetoothClient.isConnected())bluetooth.send("LIVE_STOP\n");running=false;getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);radar.setBrowseEnabled(true);showStartButton(false);bluetooth.release();super.onStop();}
+    @Override protected void onStart(){super.onStart();running=false;getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);bluetooth.activate();if(BluetoothClient.isConnected()&&!BluetoothClient.isContinuousDataSource())bluetooth.send("LIVE_STOP\n");updateStatus();showStartButton(false);radar.setBrowseEnabled(true);}
+    @Override protected void onStop(){perfMonitor.stop();playingFile=false;playbackHandler.removeCallbacks(playTick);if(BluetoothClient.isConnected()&&!BluetoothClient.isContinuousDataSource())bluetooth.send("LIVE_STOP\n");running=false;getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);radar.setBrowseEnabled(true);showStartButton(false);bluetooth.release();super.onStop();}
 
     private static double ricker(double x,double mu,double sigma){ double t=(x-mu)/Math.max(1e-6,sigma); double t2=t*t; return (1.0-t2)*Math.exp(-0.5*t2); }
 
@@ -383,7 +387,7 @@ public final class MagneticRadarActivity extends Activity implements BluetoothCl
                         values.add(v);
                     }
                 }else throw new java.io.IOException("KTD GMR kayıt dosyası değil");
-                runOnUiThread(()->{playingFile=false;playbackHandler.removeCallbacks(playTick);running=false;bluetooth.send("LIVE_STOP\n");fileMode=true;setFileTitle(displayFileName(uri));playback.clear();playback.addAll(values);preview();radar.setBrowseEnabled(true);showStartButton(false);Toast.makeText(this,"Dosya açıldı: "+values.size()+" ölçüm",Toast.LENGTH_SHORT).show();});
+                runOnUiThread(()->{playingFile=false;playbackHandler.removeCallbacks(playTick);running=false;if(!BluetoothClient.isContinuousDataSource())bluetooth.send("LIVE_STOP\n");fileMode=true;setFileTitle(displayFileName(uri));playback.clear();playback.addAll(values);preview();radar.setBrowseEnabled(true);showStartButton(false);Toast.makeText(this,"Dosya açıldı: "+values.size()+" ölçüm",Toast.LENGTH_SHORT).show();});
             }catch(Exception e){runOnUiThread(()->Toast.makeText(this,"Dosya açılamadı: "+e.getMessage(),Toast.LENGTH_LONG).show());}}).start();
         }
     }

@@ -1,0 +1,60 @@
+KTD 3D ANALYZER v3.9.84 — ARDUINO NANO + HC-05 / ESP32 ORTAK VERI
+=================================================================
+
+BLUETOOTH
+- Eşleşmiş bütün Classic Bluetooth SPP (RFCOMM) cihazları seçilebilir.
+- Cihaz adı HC-05, BT05, KTD, NANO, ALI_DEDEKTOR vb. olmak zorunda DEĞİLDİR.
+- Bağlantı eşleştirilmiş cihazın MAC adresi üzerinden yapılır.
+- Android ayarlarından cihazla ÖNCE eşleştirme yapılmalıdır.
+- BLE-only modüller (örn. bazı HM-10 ve BLE UART) SPP değildir; bu sürüm BLE değildir.
+
+BLUETOOTH BAĞLANTI TİPİ
+- OTOMATİK: REF paketi gönderilen ESP32 komut sistemi korunur; sade ham
+  seri veri paketleri algılanınca uygulama komutsuz akışa geçer.
+- SÜREKLİ VERİ (ARDUINO NANO/HC-05): Modülün adından BAĞIMSIZ olarak
+  gelen seri veriyi dinler. Nano'ya SAMPLE, GROUND_START, LIVE_START,
+  LIVE_STOP veya REF komutu göndermeden çalışır.
+- KOMUTLU (ESP32): Mevcut koordinatlı SAMPLE ve REF protokolü değişmez.
+- Her MAC adresinin protokol seçimi telefonda ayrı saklanır.
+
+KABUL EDİLEN SERİ VERİ ÖRNEKLERİ (her ölçüm sonunda \n veya \r\n):
+  615
+  ADC:615
+  ADC=615
+  A0:615
+  A0=615
+  RAW=615
+  SENSOR:615
+  NANO,615
+  Z:615
+  Z:615 C:2.5
+  X:30 Y:60 Z:615 C:2.5
+  30,60,615,2.5
+  30;60;615;2,5
+  REF:654  (yeni taramanın referans paketi)
+
+ARDUINO NANO MODUNDA 3D ZEMİN TARAMA
+1. HC-05 hangi isimle eşleşmişse o isimdeki/MAC'li cihazı seçin.
+2. SÜREKLİ VERİ'yi seçin (tek ADC değeri gönderen Nano için OTOMATİK de uygundur).
+3. YENİ TARAMA sonrasında gelen ilk geçerli ölçüm ortam referansı olur,
+   henüz bir hücreye işlenmez.
+4. Arazi üzerinde her noktaya gelince ÖRNEK AL'a dokunun. TELEFON
+   sıradaki yeni veri paketini mevcut hücreye yazar. Nano'dan komut yanıtı beklenmez.
+5. SIFIRLA / YENİ TARAMA ile eski REF terk edilir, ilk yeni paket referanstır.
+6. 2D, 3D, 4D / ters derinlik / 16 haneli aktivasyon sistemi değiştirilmemiştir.
+
+NORMAL CANLI ve GPR GÖRÜNÜM (MANYETİK)
+- Ardışık Nano ölçümleri aralıksız görselleştirilir. BAŞLAT / DURDUR,
+  komutsuz cihazlarda sadece uygulamanın veri çizimini durdurup başlatır.
+
+GERÇEK CANLI GPR
+- Bu ayrı ekran çok örnekli KTDGPR,TRACE paketlerini beklemeye devam eder.
+- Nano'nun bir ADC sayısı gerçek GPR yansıma izi / ns derinliği DEĞİLDİR.
+
+NOTLAR
+- 10-bit Arduino ADC ölçeği 0..1023 tür. Başka ADC çözünürlüğü varsa
+  belirtilmesi/kalibre edilmesi gerekir. 12-bit değerler gizlice 10-bit'e çevrilmez.
+- HC-05 ve Nano arasındaki seri baud ayarı EŞİT olmalıdır (çoğunlukla 9600,
+  fakat modüle ve Nano yazılımına göre değişebilir).
+- Bu paket Android kaynak kodudur, doğrudan APK değildir. GitHub Actions ile
+  derlenmelidir. Gerçek telefon + HC-05 üzerinde test henüz yapılmadı.

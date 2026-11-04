@@ -47,6 +47,8 @@ import java.util.Locale;
  */
 public final class ScanActivity extends Activity implements BluetoothClient.Listener {
     private BluetoothClient bt;
+    // Same operation as the screen's ORNEK AL button, coordinated on the Android side.
+    private final BluetoothClient.HardwareSampleListener hardwareSampleListener=()->runOnUiThread(()->requestSample());
     private final ReferenceModel ref=new ReferenceModel();
     private final Handler handler=new Handler(Looper.getMainLooper());
     private VoiceGuide voice;
@@ -56,10 +58,12 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
     private boolean running=true,awaitZero=true,manualSampleRequested=false,groundModeArmed=false;
     private boolean showValue=false,showDepth=false;
     private SensorFrame lastFrame,replayToIgnore;
-    private long lastCapture=0,linePauseUntil=0;
+    private long lastCapture=0,linePauseUntil=0,pendingRequestedAtMs=0;
+    private float pendingXcm=Float.NaN,pendingYcm=Float.NaN;
     private int index=0,palette;
     private Button connectionBtn,valueBtn,depthBtn;
     private TextView depthHint;
+    private TextView sensProHint;
     private MagneticDepthEstimator.Result gridDepthResult;
     private int analysisGeneration=0;
 
@@ -79,21 +83,30 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
         // O paket yeni taramanın referansı sayılmaz; ilk GERÇEK yeni paket beklenir.
         replayToIgnore=BluetoothClient.lastFrame();
         bt.activate();
+        BluetoothClient.addHardwareSampleListener(hardwareSampleListener);
         updateConnectionButton();
         ensureGroundMode();
     }
-    @Override protected void onStop(){bt.release();super.onStop();}
+    @Override protected void onResume(){
+        super.onResume();
+        if(data!=null)data.depthCalibrationFactor=1f;
+        if(gridView!=null)gridView.invalidate();
+    }
+    @Override protected void onStop(){BluetoothClient.removeHardwareSampleListener(hardwareSampleListener);bt.release();super.onStop();}
     @Override protected void onDestroy(){handler.removeCallbacksAndMessages(null);if(voice!=null)voice.shutdown();super.onDestroy();}
 
     private void newData(){
         data=new ScanData(Prefs.rows(this),Prefs.cols(this));
+        data.depthCalibrationFactor=1f;
         data.stepCm=Prefs.stepCm(this);
         data.startCorner=Prefs.startCorner(this);
         data.serpentine=Prefs.serpentine(this);
-        index=0;running=true;ref.clear();lastFrame=null;awaitZero=true;manualSampleRequested=false;groundModeArmed=false;linePauseUntil=0;lastCapture=0;
+        index=0;running=true;ref.clear();lastFrame=null;awaitZero=true;manualSampleRequested=false;groundModeArmed=false;linePauseUntil=0;lastCapture=0;pendingRequestedAtMs=0;pendingXcm=Float.NaN;pendingYcm=Float.NaN;
         analysisGeneration++;gridDepthResult=null;
         ScanSessionStore.current=data;
     }
+
+    private boolean smoothMap=true;
 
     private void build(){
         LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(Color.rgb(7,16,24));root.setPadding(Ui.dp(this,10),Ui.dp(this,6),Ui.dp(this,10),Ui.dp(this,8));
@@ -106,7 +119,8 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
         LinearLayout toggles=new LinearLayout(this);toggles.setGravity(Gravity.CENTER);toggles.setPadding(0,Ui.dp(this,3),0,Ui.dp(this,5));
         connectionBtn=Ui.button(this,"BLUETOOTH",false);connectionBtn.setOnClickListener(v->{if(BluetoothClient.isConnected())Toast.makeText(this,"Bağlı: "+BluetoothClient.connectedName(),Toast.LENGTH_SHORT).show();else bt.pickPaired(this);});
         valueBtn=Ui.button(this,"DEĞER",false);valueBtn.setOnClickListener(v->{showValue=!showValue;if(showValue)showDepth=false;applyOverlayMode();});
-        depthBtn=Ui.button(this,"DERİNLİK",false);depthBtn.setOnClickListener(v->{
+        depthBtn=Ui.button(this,"DERİNLİK",false);
+        depthBtn.setOnClickListener(v->{
             showDepth=!showDepth;
             if(showDepth){showValue=false;}
             applyOverlayMode();
@@ -115,15 +129,18 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
 
         // Kullanıcı isteği: 2D kareleri dışında açıklama satırı yok.
         depthHint=null;
+        sensProHint=null; // Nano ADC10 test paneli kullanıcı arayüzünden kaldırıldı.
 
         LinearLayout topActions=new LinearLayout(this);topActions.setGravity(Gravity.CENTER_VERTICAL);topActions.setPadding(Ui.dp(this,2),Ui.dp(this,2),Ui.dp(this,2),Ui.dp(this,5));
         addTopAction(topActions,"Izgara",false,v->gridDialog());
         addTopAction(topActions,"Yeni Tarama",false,v->resetScan());
         addTopAction(topActions,"3D / 4D",false,v->{ScanSessionStore.current=data;startActivity(new Intent(this,AnalysisActivity.class));});
         root.addView(topActions,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,58)));
+        // 2D yalnız yumuşak harita: kare görünüm düğmesi ve 2D ANALİZ ET kaldırıldı.
+        smoothMap=true;
 
         FrameLayout host=new FrameLayout(this);
-        gridView=new ScanGridContourView(this);gridView.setData(data);gridView.setPalette(palette);gridView.setTraversal(Prefs.startCorner(this),Prefs.serpentine(this));setActiveCell();
+        gridView=new ScanGridContourView(this);gridView.setSmoothMap(true);gridView.setData(data);gridView.setPalette(palette);gridView.setTraversal(Prefs.startCorner(this),Prefs.serpentine(this));setActiveCell();
         host.addView(gridView,new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT,FrameLayout.LayoutParams.MATCH_PARENT));
         root.addView(host,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,0,1));
 
@@ -269,13 +286,17 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
      */
     private void ensureGroundMode(){
         if(groundModeArmed || !BluetoothClient.isConnected())return;
+        if(BluetoothClient.isContinuousDataSource()){
+            groundModeArmed=true; // No serial commands are required by a Nano/HC-05 stream.
+            return;
+        }
         if(bt.send("GROUND_START\n"))groundModeArmed=true;
     }
 
     /** SIFIRLA yeni bir çekimdir: eski referans ve hücreler KESİNLİKLE karışmaz. */
     private void zeroNow(){
         if(!beginFreshScan())return;
-        if(BluetoothClient.isConnected())bt.send("REF\n");
+        if(BluetoothClient.isConnected()&&!BluetoothClient.isContinuousDataSource())bt.send("REF\n");
         Toast.makeText(this,"Yeni çekim • yeni ortam referansı bekleniyor",Toast.LENGTH_SHORT).show();
     }
 
@@ -286,16 +307,32 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
     private void requestSample(){
         if(!BluetoothClient.isConnected()){Toast.makeText(this,"Bluetooth bağlantısı yok",Toast.LENGTH_SHORT).show();bt.pickPaired(this);return;}
         if(data.full()){Toast.makeText(this,"Tarama tamamlandı. Yeni Tarama seçin.",Toast.LENGTH_SHORT).show();return;}
+        if(BluetoothClient.isContinuousDataSource() && (awaitZero||!ref.hasReference())){
+            Toast.makeText(this,"Yeni çekimin ilk sensör referansı bekleniyor",Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if(manualSampleRequested){
+            if(System.currentTimeMillis()-pendingRequestedAtMs<6000L){
+                Toast.makeText(this,"Önceki örnek yanıtı bekleniyor",Toast.LENGTH_SHORT).show();return;
+            }
+            manualSampleRequested=false; // timed out: allow one new request
+        }
         int[] q=cellForIndex(index);
         if(q[0]<0||q[1]<0)return;
         // Uygulamanın kanonik koordinatı: X daima ileri yön, Y yan sıra yönüdür.
         float xCoord=(data.rows-1-q[0])*data.stepCm/100f;
         float yCoord=(data.startCorner==1?(data.cols-1-q[1]):q[1])*data.stepCm/100f;
         manualSampleRequested=true;
-        String cmd=String.format(Locale.US,"SAMPLE X=%.2f Y=%.2f\n",xCoord,yCoord);
+        pendingRequestedAtMs=System.currentTimeMillis();pendingXcm=xCoord*100f;pendingYcm=yCoord*100f;
+        String cmd=String.format(Locale.US,"SAMPLE X=%.0f Y=%.0f\n",xCoord*100f,yCoord*100f);
+        if(BluetoothClient.isContinuousDataSource()){
+            // HC-05 only transmits; capture the NEXT new sensor frame at this grid cell.
+            // Nothing is transmitted to Arduino, regardless of the Bluetooth device name.
+            return;
+        }
         boolean sent=bt.send(cmd);
-        if(!sent)manualSampleRequested=false;
-        Toast.makeText(this,sent?"Tek örnek istendi":"Örnek komutu gönderilemedi",Toast.LENGTH_SHORT).show();
+        if(!sent){manualSampleRequested=false;pendingRequestedAtMs=0;}
+        if(!sent)Toast.makeText(this,"Örnek komutu gönderilemedi",Toast.LENGTH_SHORT).show();
     }
 
     @Override public void onFrame(SensorFrame f){runOnUiThread(()->consume(f));}
@@ -324,26 +361,54 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
         float signal=f.signal();
         float rawSignal=coerceRawSignal(signal);
         if(Float.isNaN(rawSignal))return;
-        SensorFrame frame=f.hasXYZC?new SensorFrame(f.x,f.y,rawSignal,f.c):new SensorFrame(rawSignal);
+        SensorFrame frame=f.hasXYZC?new SensorFrame(f.x/100f,f.y/100f,rawSignal,f.c):new SensorFrame(rawSignal);
         lastFrame=frame;
 
         // İlk yeni sinyal ve her manuel SIFIRLA sonrası ilk yeni sinyal yalnız referanstır; gride yazılmaz.
+        // Reference is only taken by the FIRST explicit SAMPLE button response (REF:512).
         if(awaitZero||!ref.hasReference()){
-            acceptReference(rawSignal);
+            if(BluetoothClient.isContinuousDataSource()){
+                // Every NEW grid scan takes the first real arriving Nano frame as baseline.
+                // Never reuse a packet replayed from the previous activity.
+                acceptReference(rawSignal);
+            }
             return;
         }
 
-        if(!running||data.full())return;
+        if(!running||data.full()||!manualSampleRequested)return;
         long now=System.currentTimeMillis();
-        if(now<linePauseUntil)return;
+        // A delayed/out-of-order sample must NEVER occupy the next grid cell.
+        // Position is in cm in the device protocol; parsed SensorFrame coordinates are metres.
+        if(now-pendingRequestedAtMs>6000L){manualSampleRequested=false;return;}
+        boolean serialStream=BluetoothClient.isContinuousDataSource();
+        if(!serialStream && (!f.hasXYZC || !Float.isFinite(f.x) || !Float.isFinite(f.y))){
+            // Legacy scalar frames can be from NORMAL/GMR streaming, not a specific SAMPLE request.
+            // Manual survey requires a coordinate-stamped response to prevent wrong-cell writes.
+            Toast.makeText(this,"Koordinatsız veri reddedildi; ESP32 SAMPLE paketini kontrol edin",Toast.LENGTH_SHORT).show();
+            manualSampleRequested=false;return;
+        }
+        if(!serialStream && (Math.abs(f.x-pendingXcm)>1.5f || Math.abs(f.y-pendingYcm)>1.5f)){
+            // Keep the pending request: its matching reply may still be in transit.
+            return;
+        }
+        if(data.filled[cellForIndex(index)[0]][cellForIndex(index)[1]])return;
+        // Manual mode: button is the only trigger; do not skip user-requested samples
+        // on automatic line/voice delays.
+        // if(now<linePauseUntil)return;
         int interval=Prefs.voiceGuide(this)?Math.max(650,Prefs.intervalMs(this)):Math.max(250,Prefs.intervalMs(this));
         boolean force=manualSampleRequested;
         boolean firstGridSample=index==0;
         if(!force&&!firstGridSample&&now-lastCapture<interval)return;
 
-        manualSampleRequested=false;lastCapture=now;
+        manualSampleRequested=false;pendingRequestedAtMs=0;lastCapture=now;
         int[] q=cellForIndex(index);int line=index/data.rows,point=index%data.rows;
-        data.put(q[0],q[1],frame,ref.visualDelta(rawSignal));
+        // For a data-only Nano, coordinates come from the selected grid cell,
+        // not from optional/missing serial X/Y fields.
+        SensorFrame stored=serialStream?
+            new SensorFrame(Float.NaN,Float.NaN,rawSignal,f.channelC()):frame;
+        data.put(q[0],q[1],stored,ref.visualDelta(rawSignal));
+        // C = 800/Z is a derived signal index, not measured metres.
+        if(Float.isFinite(rawSignal)&&rawSignal>0f){data.c[q[0]][q[1]]=com.ktd.analyzer.data.InverseSignalIndex.fromRaw(rawSignal);data.depth[q[0]][q[1]]=Float.NaN;data.cIsDerivedFromRaw=true;data.derivedCDivisor=800;}
         NeutralExperimentalDepth.apply(data);
         index++;
         analysisGeneration++;gridDepthResult=null;
@@ -375,9 +440,9 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
         }
         ref.zero(raw);data.reference=raw;awaitZero=false;
         voice.setEnabled(Prefs.voiceGuide(this));voice.say("Yeni çekim ortam referansı alındı.");
-        if(BluetoothClient.isConnected()){
-            bt.send("RATE=20\n");bt.send("LIVE_START\n");
-        }
+        // 3D zemin tarama NEVER calls LIVE_START: first manual SAMPLE is only REF.
+        // Subsequent SAMPLE commands receive exactly one new measurement.
+        manualSampleRequested=false;pendingRequestedAtMs=0;
         lastCapture=0;
         applyOverlayMode();
     }

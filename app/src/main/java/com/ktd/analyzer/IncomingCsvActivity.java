@@ -19,6 +19,8 @@ import com.ktd.analyzer.data.ScanData;
 import com.ktd.analyzer.data.ScanSessionStore;
 
 import java.util.ArrayList;
+import java.io.InputStream;
+import com.ktd.analyzer.gpr.GprFileIo;
 
 /**
  * Android ACTION_VIEW / ACTION_SEND / ACTION_SEND_MULTIPLE ile WhatsApp, Dosyalar,
@@ -104,6 +106,32 @@ public final class IncomingCsvActivity extends Activity {
                     String filename=displayName(uri);
                     // Adin Tarama/Ali/Olcum ya da baska bir sey olmasi HIC onemli degil.
                     // Ilk once dosya icerigini kontrol et, CSV/V3D olarak oku.
+                    boolean segy=filename.toLowerCase(java.util.Locale.ROOT).endsWith(".sgy") || filename.toLowerCase(java.util.Locale.ROOT).endsWith(".segy");
+                    if(!segy) {
+                        try(InputStream in=getContentResolver().openInputStream(uri)) {
+                            if(in!=null){
+                                byte[] h=new byte[3600];int total=0;
+                                while(total<h.length){int r=in.read(h,total,h.length-total);if(r<0)break;total+=r;}
+                                segy=total==3600 && GprFileIo.looksLikeSegyHeader(h);
+                            }
+                        }
+                    }
+                    if(segy){
+                        // SGY doğrudan GPR okuyucusuna gider. URI tek seferlik okunur.
+                        try(InputStream in=getContentResolver().openInputStream(uri)){
+                            if(in==null)throw new Exception("SGY dosyası okunamadı");
+                            GprFileIo.Record checked=GprFileIo.readSegy(in);
+                            if(checked.traces.isEmpty())throw new Exception("SGY izleri boş");
+                        }
+                        final Uri openUri=uri;
+                        runOnUiThread(()->{
+                            Intent open=new Intent(this,LiveGprActivity.class);
+                            open.setData(openUri);open.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                            startActivity(open);
+                            finish();
+                        });
+                        return;
+                    }
                     boolean v3d=MeasurementFileReader.isV3d(this,uri);
                     ScanData d=MeasurementFileReader.read(this,uri,Prefs.stepCm(this));
                     if (d == null || d.count < 1) throw new Exception("Ölçüm verisi bulunamadı");

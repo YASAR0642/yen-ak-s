@@ -62,10 +62,19 @@ public final class GprFileIo {
                 for(int i=0;i<n;i++)vals[i]=Short.parseShort(parts[i+1].trim());
                 traces.add(new GprProtocol.Trace(seq,vals));
             }catch(NumberFormatException bad){throw new IOException("Geçersiz radar izi veya örnek değeri",bad);}
-            if(traces.size()>=1600)break;
+            if(traces.size()>=100000)throw new IOException("Çok büyük CSV kaydı; kayıt bölünmeli");
         }
         if(traces.isEmpty())throw new IOException("Radar izi bulunamadı");
         return new Record(traces,ns,dx);
+    }
+    public static boolean looksLikeSegyHeader(byte[] h){
+        if(h==null||h.length<3600)return false;
+        // SEG-Y binary header: sample count at 3220, format at 3224.
+        for(boolean le:new boolean[]{false,true}){
+            int n=u16(h,3220,le),fmt=u16(h,3224,le);
+            if(n>=1&&n<=32768&&(fmt==1||fmt==2||fmt==3||fmt==5||fmt==8))return true;
+        }
+        return false;
     }
     private static int u16(byte[] b,int index,boolean le){int x=b[index]&255,y=b[index+1]&255;return le?(x|(y<<8)):((x<<8)|y);}
     private static int i32(byte[] b,int idx,boolean le){
@@ -98,7 +107,10 @@ public final class GprFileIo {
         String textualHeader=new String(text,java.nio.charset.StandardCharsets.ISO_8859_1).toUpperCase(Locale.US);
         // KTD PC GPR v8.5 exports SGY with a *placeholder* 1 us sample interval.
         // Never treat that placeholder as real propagation time or metre depth.
-        boolean unverifiedTime=textualHeader.contains("REAL ACQUISITION DT UNVERIFIED")
+        // Prism's SEG-Y export is explicitly seismic-format-compatible, not calibrated GPR depth.
+        boolean prismHeader=textualHeader.contains("PRISM FOR WINDOWS")
+                || textualHeader.contains("INTENDED FOR SEISMIC (NOT GEORADAR)");
+        boolean unverifiedTime=prismHeader || textualHeader.contains("REAL ACQUISITION DT UNVERIFIED")
                 || textualHeader.contains("SAMPLE INTERVAL HEADER=1 US PLACEHOLDER");
         byte[] binary=new byte[400];exactly(in,binary);
         int interval=u16(binary,16,false),n=u16(binary,20,false),format=u16(binary,24,false);
@@ -110,7 +122,7 @@ public final class GprFileIo {
         int bytesPerSample=(format==3?2:format==8?1:4);
         if(!(format==1||format==2||format==3||format==5||format==8))throw new IOException("Desteklenmeyen SEG-Y format kodu: "+format);
         List<GprProtocol.Trace> results=new ArrayList<>();
-        for(int i=0;i<1600;i++){
+        for(int i=0;i<100000;i++){
             byte[] hdr=new byte[240];
             int first=in.read();if(first==-1)break;
             hdr[0]=(byte)first;
