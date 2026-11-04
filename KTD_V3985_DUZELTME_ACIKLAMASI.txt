@@ -1,0 +1,18 @@
+KTD 3D ANALYZER v3.9.85
+
+GitHub Javac derleme hatasi duzeltildi:
+- ScanActivity.java cift nanoButtonAutoMode tanimi tekillestirildi.
+- lastNanoTriggerMs cift tanimi tekillestirildi.
+- deviceModeLabel() cift metodu tekillestirildi.
+- Tekrarlanan Nano fiziksel buton dinleyicisi tekillestirildi.
+- Cift ayar okumasi ve cift sifirlama kaldirildi.
+
+Nano donanim notu: ATmega328P'nin A1/A2 girisleri, harici ADS1115 yok.
+Android Nano uyumluluk modu gelen seri sayisal paketleri isler.
+Yuklenmis eski HEX firmware'inin gercekte iki ADC kanalini okuyup
+Bluetooth uzerinden gonderdigi dogrulanmadi; Android yazilimi
+firmware'in okumadigi bir kanalin verisini elde edemez.
+
+ESP32 kodu degistirilmedi.
+Bu paket ZIP butunlugu ve derleme hatasinin kaynak duzeyinde giderilmesi
+bakimindan denetlenmistir; tam APK derlemesi ve Nano saha testi yapilmamistir.

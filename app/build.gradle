@@ -8,8 +8,8 @@ android {
         applicationId 'com.ktd.analyzer'
         minSdk 23
         targetSdk 35
-        versionCode 3984
-        versionName '3.9.84-nano-uyumluluk' 
+        versionCode 3985
+        versionName '3.9.85-nano-derleme-duzeltme' 
     }
 
     buildTypes {

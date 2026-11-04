@@ -59,8 +59,6 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
     private boolean legacyDeviceMode=false; // Nano / generic stream mode: Android owns the grid coordinates.
     private boolean nanoButtonAutoMode=false; // Only when device emits one frame per hardware press.
     private long lastNanoTriggerMs=0L;
-    private boolean nanoButtonAutoMode=false; // Only when the device emits a frame per hardware press.
-    private long lastNanoTriggerMs=0L;
     private Button deviceModeBtn;
     private boolean showValue=false,showDepth=false;
     private SensorFrame lastFrame,replayToIgnore;
@@ -80,7 +78,6 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
         voice.setEnabled(Prefs.voiceGuide(this));
         palette=Prefs.palette(this);
         legacyDeviceMode=getPreferences(MODE_PRIVATE).getBoolean("legacy_device_mode", false);
-        nanoButtonAutoMode=getPreferences(MODE_PRIVATE).getBoolean("nano_button_auto", false);
         nanoButtonAutoMode=getPreferences(MODE_PRIVATE).getBoolean("nano_button_auto", false);
         newData();
         build();
@@ -110,7 +107,7 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
         data.stepCm=Prefs.stepCm(this);
         data.startCorner=Prefs.startCorner(this);
         data.serpentine=Prefs.serpentine(this);
-        index=0;running=true;ref.clear();lastFrame=null;awaitZero=true;manualSampleRequested=false;groundModeArmed=false;lastNanoTriggerMs=0L;lastNanoTriggerMs=0L;linePauseUntil=0;lastCapture=0;pendingRequestedAtMs=0;pendingXcm=Float.NaN;pendingYcm=Float.NaN;
+        index=0;running=true;ref.clear();lastFrame=null;awaitZero=true;manualSampleRequested=false;groundModeArmed=false;lastNanoTriggerMs=0L;linePauseUntil=0;lastCapture=0;pendingRequestedAtMs=0;pendingXcm=Float.NaN;pendingYcm=Float.NaN;
         analysisGeneration++;gridDepthResult=null;
         ScanSessionStore.current=data;
     }
@@ -182,11 +179,6 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
         root.addView(bottomActions,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,58)));
 
         setContentView(root);Ui.applySafeInsets(this,root);applyOverlayMode();updateConnectionButton();
-    }
-
-    private String deviceModeLabel(){
-        return !legacyDeviceMode?"CİHAZ: ESP32":
-               nanoButtonAutoMode?"CİHAZ: NANO BUTON":"CİHAZ: NANO TELEFON";
     }
 
     private String deviceModeLabel(){
@@ -372,21 +364,6 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
         replayToIgnore=null;
         // Optional hardware-button Nano mode: each incoming frame is interpreted
         // as one press. This mode MUST NOT be used with continuous streaming devices.
-        if(legacyDeviceMode && nanoButtonAutoMode && !manualSampleRequested &&
-           !f.referencePacket && !data.full() && running){
-            long now=System.currentTimeMillis();
-            if(now-lastNanoTriggerMs>=700L){
-                int[] cell=cellForIndex(index);
-                if(cell[0]>=0&&cell[1]>=0){
-                    manualSampleRequested=true;pendingRequestedAtMs=now;
-                    pendingXcm=(data.rows-1-cell[0])*data.stepCm;
-                    pendingYcm=(data.startCorner==1?(data.cols-1-cell[1]):cell[1])*data.stepCm;
-                    lastNanoTriggerMs=now;
-                }
-            }
-        }
-        // Optional hardware-button Nano mode. ONLY use if the device emits
-        // one serial frame per hardware press, NOT with continuous streaming.
         if(legacyDeviceMode && nanoButtonAutoMode && !manualSampleRequested &&
            !f.referencePacket && !data.full() && running){
             long now=System.currentTimeMillis();
