@@ -142,22 +142,22 @@ public final class BluetoothClient {
             .setNegativeButton("İptal",null).show();
     }
 
-    /** Manual override for sketches sending coordinate-stamped streams; no HC-05 name requirement. */
+    /** Cihaz seciminden sonra ek bir veri iletisim tipi penceresi gosterme.
+     * Tüm baglantilar otomatik protokol algilama kullanir; ESP32 ve Nano
+     * paketleri mevcut decoder tarafindan icerigine gore ayristirilir.
+     */
     private void chooseProtocolAndConnect(Activity a,BluetoothDevice chosen){
+        if(chosen==null)return;
         String mac=chosen.getAddress();
-        int previous=appContext.getSharedPreferences("ktd_bt",Context.MODE_PRIVATE)
-                .getInt("protocol_"+mac,PROTOCOL_AUTO);
-        String[] options={"OTOMATİK (veriden algıla)",
-                "SÜREKLİ VERİ (Arduino Nano / HC-05 vb.)",
-                "KOMUTLU (ESP32 / SAMPLE ve REF)"};
-        new AlertDialog.Builder(a).setTitle("Veri iletişim tipi")
-            .setSingleChoiceItems(options,Math.max(0,Math.min(2,previous)),(dlg,which)->{
-                appContext.getSharedPreferences("ktd_bt",Context.MODE_PRIVATE).edit()
-                    .putString("last_mac",mac).putInt("protocol_"+mac,which).apply();
-                savedAddress=mac;
-                preferredDevice=chosen;manualDisconnect=false;
-                dlg.dismiss();connect(chosen);
-            }).setNegativeButton("İptal",null).show();
+        Context ctx=appContext!=null?appContext:a.getApplicationContext();
+        ctx.getSharedPreferences("ktd_bt",Context.MODE_PRIVATE).edit()
+                .putString("last_mac",mac)
+                .putInt("protocol_"+mac,PROTOCOL_AUTO).apply();
+        savedAddress=mac;
+        configuredProtocol=PROTOCOL_AUTO;
+        preferredDevice=chosen;
+        manualDisconnect=false;
+        connect(chosen);
     }
 
     public void connect(BluetoothDevice d){
@@ -167,8 +167,10 @@ public final class BluetoothClient {
         manualDisconnect=false;
         // Detect from content, not the module's advertising name (HC-05 can be renamed).
         Context ctx=appContext;
-        configuredProtocol=ctx==null?PROTOCOL_AUTO:ctx.getSharedPreferences("ktd_bt",Context.MODE_PRIVATE)
-                .getInt("protocol_"+d.getAddress(),PROTOCOL_AUTO);
+        // Daha once kayitli STREAM / COMMAND secimi de otomatik moda gecsin.
+        configuredProtocol=PROTOCOL_AUTO;
+        if(ctx!=null)ctx.getSharedPreferences("ktd_bt",Context.MODE_PRIVATE).edit()
+                .putInt("protocol_"+d.getAddress(),PROTOCOL_AUTO).apply();
         observedRawStream=false;observedReference=false;
         disconnectInternal(false); broadcastState("Bağlanıyor: "+safeName(d));
         EXEC.submit(()->{
