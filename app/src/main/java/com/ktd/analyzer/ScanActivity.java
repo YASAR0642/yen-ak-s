@@ -47,15 +47,6 @@ import java.util.Locale;
  */
 public final class ScanActivity extends Activity implements BluetoothClient.Listener {
     private BluetoothClient bt;
-    // ESP32 BUTTON_SAMPLE is a trigger, not itself a reading. In Nano mode the
-    // physical button usually sends the measurement frame directly; do not
-    // generate or demand a phone-side SAMPLE request for such a frame.
-    private final BluetoothClient.HardwareSampleListener hardwareSampleListener=()->runOnUiThread(()->{
-        if(!legacyDeviceMode) requestSample();
-        else if(nanoButtonAutoMode && BluetoothClient.isConnected() && !data.full()) {
-            armNanoPacket(); // next real Nano sample fills exactly one cell
-        }
-    });
     private final ReferenceModel ref=new ReferenceModel();
     private final Handler handler=new Handler(Looper.getMainLooper());
     private VoiceGuide voice;
@@ -77,6 +68,16 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
     private TextView sensProHint;
     private MagneticDepthEstimator.Result gridDepthResult;
     private int analysisGeneration=0;
+
+    // ESP32 BUTTON_SAMPLE is a trigger, not itself a reading. In Nano mode the
+    // physical button usually sends the measurement frame directly; do not
+    // generate or demand a phone-side SAMPLE request for such a frame.
+    private final BluetoothClient.HardwareSampleListener hardwareSampleListener=()->runOnUiThread(()->{
+        if(!legacyDeviceMode) requestSample();
+        else if(nanoButtonAutoMode && BluetoothClient.isConnected() && !data.full()) {
+            armNanoPacket(); // next real Nano sample fills exactly one cell
+        }
+    });
 
     @Override protected void onCreate(Bundle b){
         super.onCreate(b);

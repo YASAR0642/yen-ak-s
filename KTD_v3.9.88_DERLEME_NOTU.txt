@@ -1,0 +1,5 @@
+KTD 3D ANALYZER v3.9.88
+ScanActivity.java: HardwareSampleListener alani, legacyDeviceMode, nanoButtonAutoMode ve data alanlari tanimlandiktan sonraya tasindi.
+Bu duzeltme GitHub Actions illegal forward reference hatasini hedefler.
+Nano/ESP32 veri protokolu ve aktivasyon mantigi degistirilmedi.
+Tam Android APK derlemesi bu ortamda test edilemedi.
