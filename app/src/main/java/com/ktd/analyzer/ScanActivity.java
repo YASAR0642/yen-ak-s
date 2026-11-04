@@ -78,7 +78,17 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
         voice.setEnabled(Prefs.voiceGuide(this));
         palette=Prefs.palette(this);
         legacyDeviceMode=getPreferences(MODE_PRIVATE).getBoolean("legacy_device_mode", false);
+        // v3.9.86 migration: previously selected NANO TELEFON required a phone press.
+        // For Sens Pro with a hardware pushbutton, select NANO BUTON on first launch.
+        // The user can still choose NANO TELEFON for continuously streaming devices.
+        boolean nanoPreferenceMigrated=getPreferences(MODE_PRIVATE).getBoolean("nano_button_pref_v2",false);
         nanoButtonAutoMode=getPreferences(MODE_PRIVATE).getBoolean("nano_button_auto", false);
+        if(legacyDeviceMode && !nanoPreferenceMigrated){
+            nanoButtonAutoMode=true;
+            getPreferences(MODE_PRIVATE).edit()
+                .putBoolean("nano_button_auto",true)
+                .putBoolean("nano_button_pref_v2",true).apply();
+        }
         newData();
         build();
     }
@@ -139,13 +149,22 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
             if(data.count>0 || ref.hasReference()){
                 Toast.makeText(this,"Cihaz değiştirmek için önce Yeni Tarama seçin",Toast.LENGTH_LONG).show();return;
             }
-            if(!legacyDeviceMode){legacyDeviceMode=true;nanoButtonAutoMode=false;}
-            else if(!nanoButtonAutoMode){nanoButtonAutoMode=true;}
+            // Cycle: ESP32 -> NANO BUTON -> NANO TELEFON -> ESP32.
+            // Hardware button mode requires one new sensor frame per physical press.
+            if(!legacyDeviceMode){legacyDeviceMode=true;nanoButtonAutoMode=true;}
+            else if(nanoButtonAutoMode){nanoButtonAutoMode=false;}
             else{legacyDeviceMode=false;nanoButtonAutoMode=false;}
             getPreferences(MODE_PRIVATE).edit()
                 .putBoolean("legacy_device_mode",legacyDeviceMode)
-                .putBoolean("nano_button_auto",nanoButtonAutoMode).apply();
+                .putBoolean("nano_button_auto",nanoButtonAutoMode)
+                .putBoolean("nano_button_pref_v2",true).apply();
             deviceModeBtn.setText(deviceModeLabel());
+            if(legacyDeviceMode){
+                Toast.makeText(this,nanoButtonAutoMode
+                    ? "NANO BUTON: İlk fiziksel basış referans, sonraki basışlar tek tek hücre kaydı"
+                    : "NANO TELEFON: Önce ekrandan ÖRNEK AL, ardından cihazdan veri",
+                    Toast.LENGTH_LONG).show();
+            }
             manualSampleRequested=false;pendingRequestedAtMs=0;groundModeArmed=false;
             if(!legacyDeviceMode)ensureGroundMode();
         });
@@ -362,12 +381,14 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
         // Never use a replayed frame as an initial reference or as a new Nano sample.
         if(replayToIgnore!=null&&f==replayToIgnore){replayToIgnore=null;return;}
         replayToIgnore=null;
-        // Optional hardware-button Nano mode: each incoming frame is interpreted
-        // as one press. This mode MUST NOT be used with continuous streaming devices.
+        // NANO BUTON: the hardware press emits its own fresh ADC measurement.
+        // Android itself arms/stamps each cell; the phone button is NOT required.
+        // Never choose this mode for continuous sensor streams: their frames are
+        // indistinguishable from physical press events without firmware markers.
         if(legacyDeviceMode && nanoButtonAutoMode && !manualSampleRequested &&
            !f.referencePacket && !data.full() && running){
             long now=System.currentTimeMillis();
-            if(now-lastNanoTriggerMs>=700L){
+            if(now-lastNanoTriggerMs>=250L){
                 int[] cell=cellForIndex(index);
                 if(cell[0]>=0&&cell[1]>=0){
                     manualSampleRequested=true;pendingRequestedAtMs=now;

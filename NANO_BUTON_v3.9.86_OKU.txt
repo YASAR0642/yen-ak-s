@@ -1,0 +1,16 @@
+KTD 3D ANALYZER v3.9.86 — NANO FİZİKSEL BUTON
+
+Cihaz seçimi: ESP32 -> NANO BUTON -> NANO TELEFON -> ESP32
+Sens Pro Nano: NANO BUTON seçin (telefonun ÖRNEK AL düğmesi gerekmez).
+İlk fiziksel basış: güncel ortam referansı.
+Sonraki fiziksel basışlar: birer yeni A1/A2 ölçüm paketi geldiyse sıradaki hücre.
+Eğer Nano sürekli veri gönderiyorsa NANO TELEFON seçin: her ekran ÖRNEK AL
+düğmesi, ardından gelen bir yeni geçerli ölçümü kaydeder.
+
+ÖNEMLİ: Android, Nano'nun fiziksel butonuna doğrudan erişemez. Nano firmware'i
+her basışta Bluetooth'a sayısal ölçüm veya BUTTON_SAMPLE kontrol satırı göndermelidir.
+Mevcut Sens Pro firmware'inde bu davranış doğrulanmadı.
+Nano A1/A2 dahili 10-bit ADC, ADS1115 kullanılmaz.
+ESP32, GMR, 2D/3D/4D çizim kodları değiştirilmedi.
+
+Bu kaynak kodu statik olarak kontrol edilmiştir; Android SDK derlemesi yapılmamıştır.
