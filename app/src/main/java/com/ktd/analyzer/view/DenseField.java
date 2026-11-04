@@ -102,7 +102,7 @@ public final class DenseField {
     }
 
     private static Sample sample(ScanData d, float gx, float gy, boolean depth) {
-        // Voxler Gr idder yaklaşımı: IDW power=2 (w=1/d^2).
+        // Voxler Gridder benzeri IDW power=2 (w=1/d^2).
         // Sadece gerçekten alınmış örnekler kullanılır. Ham CSV değiştirilmez.
         // Eksik taramada uzaktaki boş alanlar doldurulmaz.
         double sw=0d, sv=0d;

@@ -14,6 +14,7 @@ package com.ktd.analyzer.data;
  */
 public final class ReferenceMeterModel {
     private ReferenceMeterModel(){}
+    // An experimental dimensionless inverse-signal index, NEVER physical metres.
     public static final float NUMERATOR=800f;
     public static final float ADC_RANGE=1023f;
     public static final float ANOMALY_THRESHOLD=15f;

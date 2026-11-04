@@ -108,11 +108,9 @@ public final class AnalysisActivity extends Activity {
         mode3Button.setOnClickListener(v->showSurface());mode4Button.setOnClickListener(v->show4D());
         Button settingsButton=Ui.button(this,"GÖRÜNÜM",false);Ui.fitText(settingsButton,10,13,1);
         settingsButton.setOnClickListener(v->showSceneSettings());
-        Button resetView=Ui.button(this,"KAMERA",false);Ui.fitText(resetView,10,13,1);
-        resetView.setOnClickListener(v->{if(volume4d!=null)volume4d.resetCamera();
-            if(surface!=null)showSurface();});
+        // KAMERA button removed: camera rotation remains available by touch.
         modes.addView(mode3Button,Ui.weight(1f));modes.addView(mode4Button,Ui.weight(1f));
-        modes.addView(settingsButton,Ui.weight(.95f));modes.addView(resetView,Ui.weight(.85f));
+        modes.addView(settingsButton,Ui.weight(.95f));
         autoReport=Ui.button(this,"ANALİZ ET",true);autoReport.setOnClickListener(v->{ScanSessionStore.current=data;startActivity(new Intent(this,AutoAnalysisActivity.class));});
         root.addView(modes,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,52)));
         root.addView(autoReport,new LinearLayout.LayoutParams(-1,Ui.dp(this,42)));
@@ -151,12 +149,13 @@ public final class AnalysisActivity extends Activity {
         LinearLayout all=new LinearLayout(this);all.setGravity(Gravity.CENTER_VERTICAL);
         all.setPadding(Ui.dp(this,10),Ui.dp(this,2),Ui.dp(this,10),Ui.dp(this,2));
         all.setBackgroundColor(Color.rgb(10,24,32));
-        levelLabel=Ui.text(this,"Anomali / Derinlik: Tümü",12,Color.WHITE);
+        levelLabel=Ui.text(this,"Görsel seviye: Tümü",12,Color.WHITE);
         Ui.fitText(levelLabel,10,13,1);
         levelSeek=new SeekBar(this);levelSeek.setMax(100);levelSeek.setProgress(0);
         levelSeek.setOnSeekBarChangeListener(simple(p->{
             boolean available=visualData!=null&&visualData.hasDepthData();
             float maxDepth=available?visualData.maxDepthMeters():hasModelDepth()?modelMaxDepth():0f;
+            // Surgu, ters sinyalden turetilen C indeksinde fiziksel metre degildir.
             depthSliceMeters=(!available||p==0)?0f:maxDepth*p/100f;
             if(showing4D){
                 if(volume4d!=null)volume4d.setDepthFocusMeters(depthSliceMeters);
@@ -172,16 +171,19 @@ public final class AnalysisActivity extends Activity {
 
     private void updateDepthLabel(){
         boolean available=visualData!=null&&visualData.hasDepthData();
+        boolean derived=visualData!=null&&visualData.rulerDerivedDepth;
         boolean modelReady=hasModelDepth();
         if(levelSeek!=null)levelSeek.setEnabled(available);
         if(levelLabel==null)return;
-        
-        if(!available&&!modelReady){
-            levelLabel.setText("Z: göreli hacim (derinlik yok)");return;
+        if(!available&&!modelReady){levelLabel.setText("Z: goreli hacim");return;}
+        if(depthSliceMeters<=0f){levelLabel.setText(derived?"C indeksi: Tumu":"Derinlik: Tumu");return;}
+        if(derived){
+            float max=visualData.maxDepthMeters();
+            float relative=max>0f?100f*depthSliceMeters/max:0f;
+            levelLabel.setText(String.format(Locale.forLanguageTag("tr-TR"),"C katmani: %.0f%%",relative));
+        }else{
+            levelLabel.setText(String.format(Locale.forLanguageTag("tr-TR"),"%.2f m",depthSliceMeters));
         }
-        if(depthSliceMeters<=0f){levelLabel.setText(available?"Derinlik: Tümü":"Derinlik: Tümü");return;}
-        levelLabel.setText(String.format(Locale.forLanguageTag("tr-TR"),
-            available?"%.2f m":"%.2f m",depthSliceMeters));
     }
 
     private boolean hasModelDepth(){

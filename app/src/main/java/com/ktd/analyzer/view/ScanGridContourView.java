@@ -71,10 +71,12 @@ public final class ScanGridContourView extends View {
             capturedFor=data;capturedPalette=palette;
             capturedColors=new int[data.rows][data.cols];captured=new boolean[data.rows][data.cols];
         }
+        // Voxler Gridder benzeri ortak IDW (power=2) hesabı: 2D/3D/4D aynı DenseField kullanır.
+        // Ham Z/C korunur, gridden türetilen noktalar saha ölçümü sayılmaz.
         // Harita modu: ham kayıtlar değişmeden, komşu örneklerden sürekli yüzey.
         // Henüz ölçülmemiş kareler daima boş bırakılır.
         if(smoothMap && data.count>=4){
-            DenseFieldClassic field=DenseFieldClassic.from(data,Math.min(96,Math.max(48,data.cols*10)),true);
+            DenseField field=DenseField.from(data,Math.min(96,Math.max(48,data.cols*10)),false);
             Bitmap bmp=Bitmap.createBitmap(field.w,field.h,Bitmap.Config.ARGB_8888);
             int[] pixels=new int[field.w*field.h];
             for(int y=0;y<field.h;y++)for(int x=0;x<field.w;x++){

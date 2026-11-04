@@ -36,61 +36,13 @@ public final class DenseFieldClassic {
 
     public static DenseFieldClassic from(ScanData d, int target) {return from(d,target,true);}
 
+    /** Eski API: artık 2D/3D/4D aynı IDW power=2 gridleme motorunu kullanır.
+     * Bağımsız, farklı yöntemle 2D yüzey oluşturulmasını önler.
+     */
     public static DenseFieldClassic from(ScanData d, int target, boolean smoothing) {
-        int w = Math.max(18, Math.min(96, target));
-        int h = w;
-        float[] out = new float[w * h];
-        boolean[] ok = new boolean[w * h];
-        float[] dep = new float[w * h];
-        boolean[] depOk = new boolean[w * h];
-        Arrays.fill(out, 0f);
-        Arrays.fill(dep, 0f);
-
-        if (d == null || d.count == 0)
-            return new DenseFieldClassic(w, h, out, ok, dep, depOk, 10f, 10f, 0f);
-
-        for (int yy = 0; yy < h; yy++) {
-            float gy = h == 1 ? 0f : yy * (d.rows - 1f) / (h - 1f);
-            for (int xx = 0; xx < w; xx++) {
-                float gx = w == 1 ? 0f : xx * (d.cols - 1f) / (w - 1f);
-                Sample s = sampleDelta(d, gx, gy);
-                Sample z = sampleDepth(d, gx, gy);
-                int i = yy * w + xx;
-                ok[i] = s.valid;
-                if (s.valid) {
-                    float v = Math.abs(s.v) <= ReferenceModel.GROUND_BAND ? 0f : s.v;
-                    out[i] = v;
-                }
-                depOk[i] = z.valid;
-                if (z.valid) dep[i] = Math.abs(z.v);
-            }
-        }
-
-        // v3.5.0: ham ölçümü değiştirmeden, sadece görselleştirme katmanında
-        // tek sensör için kararlı işleme. Önce 3x3 medyan darbe/parazitleri kırar,
-        // ardından hafif Gauss-benzeri smoothing grid geçişlerini yumuşatır.
-        if(smoothing){median3x3(out, ok, w, h);smooth(out, ok, w, h, 1);}
-        // Derinlik yalnız açık (ve 800/Z ile türetilmemiş) C kanalından gelebilir.
-        // derinlik alanına ayrıca smoothing uygulanmaz; yalnız enterpolasyon kullanılır.
-
-        // Tek bir aşırı örnek bütün 3D/4D ölçeğini bozmasın: %96 sağlam genlik
-        // referansı çıkarılır ve yalnız görsel alanda bunun 1.35 katına winsorize edilir.
-        int n = 0;
-        float[] abs = new float[out.length];
-        for (int i = 0; i < out.length; i++) if (ok[i]) abs[n++] = Math.abs(out[i]);
-        float robust = Math.max(ReferenceModel.GROUND_BAND * 1.6f, percentile(abs, n, .96f));
-        float clip = Math.max(ReferenceModel.GROUND_BAND * 2f, robust * 1.35f);
-        float max = 10f, maxDepth = 0f;
-        for (int i = 0; i < out.length; i++) {
-            if (ok[i]) {
-                out[i] = Math.max(-clip, Math.min(clip, out[i]));
-                max = Math.max(max, Math.abs(out[i]));
-            }
-            if (depOk[i] && Float.isFinite(dep[i])) maxDepth = Math.max(maxDepth, Math.abs(dep[i]));
-        }
-        // Kırpma sonrası tek hafif geçiş; veri işleme yalnız görüntü içindir.
-        if(smoothing)smooth(out, ok, w, h, 1);
-        return new DenseFieldClassic(w, h, out, ok, dep, depOk, max, Math.min(max, robust), maxDepth);
+        DenseField unified=DenseField.from(d,target,smoothing);
+        return new DenseFieldClassic(unified.w,unified.h,unified.value,unified.valid,
+                unified.depth,unified.depthValid,unified.maxAbs,unified.robustAbs,unified.maxDepth);
     }
 
     private static Sample sampleDelta(ScanData d, float gx, float gy) {

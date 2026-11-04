@@ -20,7 +20,8 @@ public final class CellDepthDisplay {
             if(!known())return "—";
             String m=String.format(Locale.forLanguageTag("tr-TR"),"%.2f",meters);
             // 0,00 ortam yüzeyinin (anomali yok) işaretidir.
-            return source==Source.MODEL||source==Source.INVERSE_INDEX||source==Source.RULER?(meters==0f?"0,00":"≈"+m):source==Source.VERIFIED?"✓"+m:m;
+            return source==Source.INVERSE_INDEX?"İ:"+m:
+                   (source==Source.MODEL||source==Source.RULER?(meters==0f?"0,00":"≈"+m):source==Source.VERIFIED?"✓"+m:m);
         }
     }
     private static final Value UNKNOWN=new Value(Source.UNKNOWN,Float.NaN);

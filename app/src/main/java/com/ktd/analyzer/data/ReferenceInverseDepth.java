@@ -97,8 +97,14 @@ public final class ReferenceInverseDepth {
         if(original==null)return null;
         ScanData out=createVisualDepth(original);
         for(int r=0;r<out.rows;r++)for(int c=0;c<out.cols;c++){
-            float v=ReferenceMeterModel.meters(out.raw[r][c],out.reference);
-            out.depth[r][c]=out.filled[r][c] && Float.isFinite(v) ? v : Float.NaN;
+            // 800/Z is an uncalibrated SIGNAL INDEX, not metres.
+            // For 3D/4D only, map the index monotonically to a 0..10
+            // VISUAL LEVEL so weak magnetic differences cannot create
+            // fictitious 20-40 metre depth readings.
+            float index=ReferenceMeterModel.meters(out.raw[r][c],out.reference);
+            float level=Float.isFinite(index) && index>=0f
+                    ?10f*index/(10f+index):Float.NaN;
+            out.depth[r][c]=out.filled[r][c] ? level : Float.NaN;
         }
         out.cIsDerivedFromRaw=true;
         out.derivedCDivisor=800;
