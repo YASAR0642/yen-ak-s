@@ -85,7 +85,7 @@
         <activity android:name=".AnalysisActivity" android:screenOrientation="unspecified"/>
         <activity android:name=".ScanActivity" android:screenOrientation="unspecified"/>
         <activity android:name=".MainActivity" android:screenOrientation="unspecified"/>
-        <activity android:name=".ActivationActivity" android:screenOrientation="unspecified"/>
+        <activity android:name=".ActivationActivity" android:screenOrientation="unspecified" android:windowSoftInputMode="adjustResize"/>
         <activity android:name=".SplashActivity" android:exported="true" android:screenOrientation="unspecified">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>

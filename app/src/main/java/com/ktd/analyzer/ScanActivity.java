@@ -135,7 +135,16 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
         addTopAction(topActions,"Izgara",false,v->gridDialog());
         addTopAction(topActions,"Yeni Tarama",false,v->resetScan());
         addTopAction(topActions,"3D / 4D",false,v->{ScanSessionStore.current=data;startActivity(new Intent(this,AnalysisActivity.class));});
+        addTopAction(topActions,"AKILLI RENK",true,v->SmartColorDialog.show(this,()->{gridView.setPalette(palette);}));
         root.addView(topActions,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,58)));
+        // Her ekranda görünür: 10 noktalı kullanıcı paleti editörü.
+        Button createPalette=Ui.button(this,"+ 10 RENK OLUŞTUR / KAYDET",true);
+        createPalette.setTextColor(Color.WHITE);
+        createPalette.setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.rgb(0,128,111)));
+        createPalette.setOnClickListener(v->CustomPaletteEditor.show(this,()->{
+            palette=Prefs.palette(this);gridView.setPalette(palette);
+        }));
+        root.addView(createPalette,new LinearLayout.LayoutParams(-1,Ui.dp(this,46)));
         // 2D yalnız yumuşak harita: kare görünüm düğmesi ve 2D ANALİZ ET kaldırıldı.
         smoothMap=true;
 
@@ -146,7 +155,9 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
 
         HorizontalScrollView ps=new HorizontalScrollView(this);ps.setHorizontalScrollBarEnabled(false);PaletteStripView palettes=new PaletteStripView(this);
         palettes.setListener(p->{palette=p;Prefs.setPalette(this,p);gridView.setPalette(p);});
-        ps.addView(palettes,new HorizontalScrollView.LayoutParams(Ui.dp(this,ColorMaps.COUNT*92),Ui.dp(this,52)));root.addView(ps,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,54)));
+        ps.addView(palettes,new HorizontalScrollView.LayoutParams(Ui.dp(this,PaletteStripView.entryCount()*112),Ui.dp(this,52)));
+        // Akilli renk tusu ust satirda daima gorunur; palet tum genisligi kullanir.
+        root.addView(ps,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,54)));
 
         LinearLayout bottomActions=new LinearLayout(this);bottomActions.setGravity(Gravity.CENTER_VERTICAL);bottomActions.setPadding(Ui.dp(this,2),Ui.dp(this,4),Ui.dp(this,2),Ui.dp(this,5));
         addBottomAction(bottomActions,"Kaydet",false,v->saveNamed());

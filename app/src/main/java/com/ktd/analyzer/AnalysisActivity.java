@@ -111,8 +111,25 @@ public final class AnalysisActivity extends Activity {
         // KAMERA button removed: camera rotation remains available by touch.
         modes.addView(mode3Button,Ui.weight(1f));modes.addView(mode4Button,Ui.weight(1f));
         modes.addView(settingsButton,Ui.weight(.95f));
+        Button smartColors=Ui.button(this,"AKILLI RENK",true);
+        Ui.fitText(smartColors,9,12,2);
+        smartColors.setOnClickListener(v->SmartColorDialog.show(this,()->{
+            scale.setPalette(palette);
+            if(surface!=null)surface.setPalette(palette);
+            if(volume4d!=null)volume4d.setPalette(palette);
+        }));
+        modes.addView(smartColors,Ui.weight(1.25f));
         autoReport=Ui.button(this,"ANALİZ ET",true);autoReport.setOnClickListener(v->{ScanSessionStore.current=data;startActivity(new Intent(this,AutoAnalysisActivity.class));});
         root.addView(modes,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,52)));
+        Button createPalette=Ui.button(this,"+ 10 RENK OLUŞTUR / KAYDET",true);
+        createPalette.setTextColor(Color.WHITE);
+        createPalette.setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.rgb(0,128,111)));
+        createPalette.setOnClickListener(v->CustomPaletteEditor.show(this,()->{
+            palette=Prefs.palette(this);scale.setPalette(palette);
+            if(surface!=null)surface.setPalette(palette);
+            if(volume4d!=null)volume4d.setPalette(palette);
+        }));
+        root.addView(createPalette,new LinearLayout.LayoutParams(-1,Ui.dp(this,46)));
         root.addView(autoReport,new LinearLayout.LayoutParams(-1,Ui.dp(this,42)));
         autoReport.setVisibility(View.GONE);
         depthHeadline=null;depthDetail=null;
@@ -131,7 +148,9 @@ public final class AnalysisActivity extends Activity {
 
         HorizontalScrollView ps=new HorizontalScrollView(this);ps.setHorizontalScrollBarEnabled(false);PaletteStripView palettes=new PaletteStripView(this);
         palettes.setListener(p->{palette=p;Prefs.setPalette(this,p);scale.setPalette(p);if(surface!=null)surface.setPalette(p);if(volume4d!=null)volume4d.setPalette(p);});
-        ps.addView(palettes,new HorizontalScrollView.LayoutParams(Ui.dp(this,ColorMaps.COUNT*92),Ui.dp(this,52)));root.addView(ps,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,54)));
+        ps.addView(palettes,new HorizontalScrollView.LayoutParams(Ui.dp(this,PaletteStripView.entryCount()*112),Ui.dp(this,52)));
+        // 3D ve 4D ortak renk ayar butonu ust mod seciminde sabit durur.
+        root.addView(ps,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,54)));
 
         LinearLayout actions=new LinearLayout(this);actions.setGravity(Gravity.CENTER);
         // CSV/V3D açma ve CSV kayıt butonları görüntüleme ekranından kaldırıldı.addBottom(actions,"PAYLAŞ",v->shareDialog());

@@ -37,7 +37,7 @@ public final class Volume4DView extends GLSurfaceView {
     private float lastX,lastY,lastMidX,lastMidY;
 
     public Volume4DView(Context c){
-        super(c);setEGLContextClientVersion(2);setEGLConfigChooser(8,8,8,8,16,0);
+        super(c);ColorMaps.configure(c);setEGLContextClientVersion(2);setEGLConfigChooser(8,8,8,8,16,0);
         renderer=new Renderer4D();setRenderer(renderer);setRenderMode(RENDERMODE_WHEN_DIRTY);
         scaler=new ScaleGestureDetector(c,new ScaleGestureDetector.SimpleOnScaleGestureListener(){@Override public boolean onScale(ScaleGestureDetector d){renderer.zoom=clamp(renderer.zoom*d.getScaleFactor(),.24f,6.0f);syncAxes();requestRender();return true;}});
     }
@@ -218,6 +218,14 @@ public final class Volume4DView extends GLSurfaceView {
                             depthFocusMeters<=0f?1f:(float)Math.exp(-.5f*df*df);
 
                     float shaped=(float)Math.pow(bn,.90f*sharpness);
+                    if(positive){
+                        // Mineral benzeri zayif/orta pozitif alanlar 4D hacimde gereksiz yayilmasin.
+                        // Guclu metal benzeri cekirdekler korunur; zayif genis alanlar bastirilir.
+                        if(bn<0.22f) shaped*=0.08f;
+                        else if(bn<0.34f) shaped*=0.18f;
+                        else if(bn<0.46f) shaped*=0.35f;
+                        else if(bn<0.58f) shaped*=0.55f;
+                    }
                     v[q]=signMax*shaped*depthKernel*focusKernel;
                     q++;
                 }

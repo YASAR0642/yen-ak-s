@@ -10,6 +10,8 @@ import android.graphics.Typeface;
 import android.os.Bundle;
 import android.text.InputType;
 import android.view.Gravity;
+import android.view.View;
+import android.widget.ScrollView;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -26,35 +28,47 @@ public final class ActivationActivity extends Activity {
         getWindow().setStatusBarColor(Color.rgb(3, 8, 12));
         getWindow().setNavigationBarColor(Color.BLACK);
 
+        // Keep the activation action visible on displays with large font/display scaling.
+        // The form above it scrolls independently instead of pushing the button off-screen.
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setGravity(Gravity.CENTER_HORIZONTAL);
-        root.setPadding(Ui.dp(this, 24), Ui.dp(this, 20), Ui.dp(this, 24), Ui.dp(this, 20));
         root.setBackgroundColor(Color.rgb(3, 8, 12));
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(false);
+        scroll.setVerticalScrollBarEnabled(true);
+        LinearLayout form = new LinearLayout(this);
+        form.setOrientation(LinearLayout.VERTICAL);
+        form.setGravity(Gravity.CENTER_HORIZONTAL);
+        form.setPadding(Ui.dp(this, 24), Ui.dp(this, 20), Ui.dp(this, 24), Ui.dp(this, 8));
+        scroll.addView(form, new ScrollView.LayoutParams(
+                ScrollView.LayoutParams.MATCH_PARENT, ScrollView.LayoutParams.WRAP_CONTENT));
+        root.addView(scroll, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
 
         ImageView logo = new ImageView(this);
         logo.setImageResource(R.drawable.ktd_logo);
         logo.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-        root.addView(logo, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, Ui.dp(this, 150)));
+        form.addView(logo, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, Ui.dp(this, 150)));
 
         TextView title = Ui.text(this, "KTD 3D ANALYZER", 24, Color.WHITE);
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         title.setGravity(Gravity.CENTER);
-        root.addView(title, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, Ui.dp(this, 48)));
+        form.addView(title, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, Ui.dp(this, 48)));
 
         TextView sub = Ui.text(this, "UYGULAMA AKTİVASYONU", 15, Color.rgb(72, 214, 235));
         sub.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         sub.setGravity(Gravity.CENTER);
-        root.addView(sub, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, Ui.dp(this, 38)));
+        form.addView(sub, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, Ui.dp(this, 38)));
 
         TextView info = Ui.text(this, "Bu cihaz için aktivasyon gereklidir. Cihaz kodunu kopyalayıp yetkili aktivasyon kodunu girin.", 13, Color.rgb(170, 195, 208));
         info.setGravity(Gravity.CENTER);
         info.setPadding(0, Ui.dp(this, 4), 0, Ui.dp(this, 14));
-        root.addView(info, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        form.addView(info, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
         TextView devLabel = Ui.text(this, "CİHAZ KODU", 12, Color.rgb(150, 180, 198));
         devLabel.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        root.addView(devLabel);
+        form.addView(devLabel);
 
         String device = LicenseManager.deviceCode(this);
         TextView deviceBox = Ui.text(this, device, 20, Color.WHITE);
@@ -64,7 +78,7 @@ public final class ActivationActivity extends Activity {
         deviceBox.setBackground(Ui.bg(Color.rgb(13, 30, 39), 14, this));
         LinearLayout.LayoutParams dbp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, Ui.dp(this, 58));
         dbp.setMargins(0, Ui.dp(this, 6), 0, Ui.dp(this, 8));
-        root.addView(deviceBox, dbp);
+        form.addView(deviceBox, dbp);
 
         TextView copy = Ui.text(this, "CİHAZ KODUNU KOPYALA", 13, Color.rgb(3, 20, 18));
         copy.setGravity(Gravity.CENTER);
@@ -75,13 +89,13 @@ public final class ActivationActivity extends Activity {
             cm.setPrimaryClip(ClipData.newPlainText("KTD Cihaz Kodu", device));
             Toast.makeText(this, "Cihaz kodu kopyalandı", Toast.LENGTH_SHORT).show();
         });
-        root.addView(copy, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, Ui.dp(this, 48)));
+        form.addView(copy, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, Ui.dp(this, 48)));
 
         TextView actLabel = Ui.text(this, "16 HANELİ AKTİVASYON KODU", 12, Color.rgb(150, 180, 198));
         actLabel.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         LinearLayout.LayoutParams alp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, Ui.dp(this, 34));
         alp.setMargins(0, Ui.dp(this, 16), 0, 0);
-        root.addView(actLabel, alp);
+        form.addView(actLabel, alp);
 
         codeInput = new EditText(this);
         codeInput.setTextColor(Color.WHITE);
@@ -94,18 +108,22 @@ public final class ActivationActivity extends Activity {
         codeInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
         codeInput.setPadding(Ui.dp(this, 12), Ui.dp(this, 10), Ui.dp(this, 12), Ui.dp(this, 10));
         codeInput.setBackground(Ui.bg(Color.rgb(13, 30, 39), 14, this));
-        root.addView(codeInput, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, Ui.dp(this, 100)));
+        form.addView(codeInput, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, Ui.dp(this, 100)));
 
         status = Ui.text(this, "", 12, Color.rgb(255, 95, 95));
         status.setGravity(Gravity.CENTER);
-        root.addView(status, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, Ui.dp(this, 34)));
+        form.addView(status, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, Ui.dp(this, 34)));
 
         TextView activate = Ui.text(this, "AKTİVE ET", 17, Color.rgb(2, 18, 16));
         activate.setGravity(Gravity.CENTER);
         activate.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         activate.setBackground(Ui.bg(Color.rgb(36, 211, 183), 15, this));
         activate.setOnClickListener(v -> doActivate());
-        root.addView(activate, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, Ui.dp(this, 56)));
+        // Fixed bottom action, outside the scrollable form.
+        LinearLayout.LayoutParams actionParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, Ui.dp(this, 56));
+        actionParams.setMargins(Ui.dp(this, 24), Ui.dp(this, 8), Ui.dp(this, 24), Ui.dp(this, 16));
+        root.addView(activate, actionParams);
 
         setContentView(root);
         Ui.applySafeInsets(this, root);

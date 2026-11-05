@@ -46,6 +46,7 @@ public final class ScanGridContourView extends View {
 
     public ScanGridContourView(Context c){
         super(c);
+        ColorMaps.configure(c);
         setBackgroundColor(Color.rgb(3,10,15));
         scaleDetector=new ScaleGestureDetector(c,new ScaleGestureDetector.SimpleOnScaleGestureListener(){
             @Override public boolean onScale(ScaleGestureDetector detector){
