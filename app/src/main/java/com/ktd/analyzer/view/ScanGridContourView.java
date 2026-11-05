@@ -7,6 +7,8 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.RectF;
 import android.view.View;
+import android.view.MotionEvent;
+import android.view.ScaleGestureDetector;
 
 import com.ktd.analyzer.data.ScanData;
 import com.ktd.analyzer.data.CellDepthDisplay;
@@ -34,7 +36,70 @@ public final class ScanGridContourView extends View {
     private int capturedPalette=-1;
     private static final float FIXED_DELTA_COLOR_RANGE=120f;
 
-    public ScanGridContourView(Context c){super(c);setBackgroundColor(Color.rgb(3,10,15));}
+    // Yalnız 2D görüntü dönüşümü; ölçüm, derinlik ve 3D/4D verileri değişmez.
+    private final ScaleGestureDetector scaleDetector;
+    private float zoom=1f, angle=0f, panX=0f, panY=0f;
+    private float prevX,prevY,prevMidX,prevMidY,prevPointerAngle;
+    private int prevTouchCount=0;
+    private static final float MIN_ZOOM=0.5f, MAX_ZOOM=8f;
+
+
+    public ScanGridContourView(Context c){
+        super(c);
+        setBackgroundColor(Color.rgb(3,10,15));
+        scaleDetector=new ScaleGestureDetector(c,new ScaleGestureDetector.SimpleOnScaleGestureListener(){
+            @Override public boolean onScale(ScaleGestureDetector detector){
+                float factor=detector.getScaleFactor();
+                if(Float.isFinite(factor) && factor>0f){
+                    zoom=Math.max(MIN_ZOOM,Math.min(MAX_ZOOM,zoom*factor));
+                    invalidate();
+                }
+                return true;
+            }
+        });
+    }
+    @Override public boolean onTouchEvent(MotionEvent e){
+        scaleDetector.onTouchEvent(e);
+        final int action=e.getActionMasked();
+        final int count=e.getPointerCount();
+        if(action==MotionEvent.ACTION_DOWN || action==MotionEvent.ACTION_POINTER_DOWN || action==MotionEvent.ACTION_POINTER_UP){
+            int nextCount=action==MotionEvent.ACTION_POINTER_UP?count-1:count;
+            if(nextCount>=2 && count>=2){
+                prevMidX=(e.getX(0)+e.getX(1))*.5f;
+                prevMidY=(e.getY(0)+e.getY(1))*.5f;
+                prevPointerAngle=(float)Math.toDegrees(Math.atan2(e.getY(1)-e.getY(0),e.getX(1)-e.getX(0)));
+            }else if(nextCount==1){
+                int survivor=action==MotionEvent.ACTION_POINTER_UP && e.getActionIndex()==0 && count>1?1:0;
+                prevX=e.getX(survivor);prevY=e.getY(survivor);
+            }
+            prevTouchCount=nextCount;
+            return true;
+        }
+        if(action==MotionEvent.ACTION_MOVE){
+            if(count>=2){
+                float midX=(e.getX(0)+e.getX(1))*.5f;
+                float midY=(e.getY(0)+e.getY(1))*.5f;
+                float a=(float)Math.toDegrees(Math.atan2(e.getY(1)-e.getY(0),e.getX(1)-e.getX(0)));
+                if(prevTouchCount>=2){
+                    panX+=midX-prevMidX;panY+=midY-prevMidY;
+                    float da=a-prevPointerAngle;
+                    if(da>180f)da-=360f;
+                    if(da< -180f)da+=360f;
+                    angle+=da;
+                }
+                prevMidX=midX;prevMidY=midY;prevPointerAngle=a;
+            }else if(count==1){
+                // Tek parmak yatay hareket: 3D/4D benzeri harita döndürme.
+                if(prevTouchCount==1)angle+=(e.getX()-prevX)*0.35f;
+                prevX=e.getX();prevY=e.getY();
+            }
+            prevTouchCount=count;invalidate();return true;
+        }
+        if(action==MotionEvent.ACTION_UP || action==MotionEvent.ACTION_CANCEL){
+            prevTouchCount=0;return true;
+        }
+        return true;
+    }
     public void setData(ScanData d){data=d;capturedFor=null;invalidate();}
     public void setPalette(int v){palette=v;capturedFor=null;invalidate();}
     public void setActiveCell(int r,int c){activeRow=r;activeCol=c;invalidate();}
@@ -59,10 +124,15 @@ public final class ScanGridContourView extends View {
         float top=topMargin+(availH-plotH)*.5f;
         RectF area=new RectF(left,top,left+plotW,top+plotH);
 
+        c.save();
+        c.translate(panX,panY);
+        c.rotate(angle,getWidth()*.5f,getHeight()*.5f);
+        c.scale(zoom,zoom,getWidth()*.5f,getHeight()*.5f);
         drawContour(c,area);
         drawGrid(c,area);
         // Koordinat aralığı ve X/Y yazıları istek gereği tamamen gizli.
         drawStart(c,area);
+        c.restore();
     }
 
     private void drawContour(Canvas c,RectF a){
@@ -142,7 +212,7 @@ public final class ScanGridContourView extends View {
         p.setAlpha(255);
         for(int r=0;r<data.rows;r++)for(int co=0;co<data.cols;co++)if(data.filled[r][co]){
             String text=overlayMode==OVERLAY_VALUE?formatSignal(data.raw[r][co]):
-                    CellDepthDisplay.at(data,depthModel,r,co).label();
+                    CellDepthDisplay.at(data,depthModel,r,co).label().replaceAll("\\s*m$", "");
             float size=fitTextSize(text,cw,ch);
             p.setTextSize(size);
             float x=a.left+(co+.5f)*cw;

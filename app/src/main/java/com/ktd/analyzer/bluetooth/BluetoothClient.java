@@ -135,7 +135,7 @@ public final class BluetoothClient {
         ArrayList<BluetoothDevice> devs=new ArrayList<>(set);String[] names=new String[devs.size()];
         for(int i=0;i<devs.size();i++){
             BluetoothDevice d=devs.get(i);
-            names[i]=safeName(d)+"  ("+d.getAddress()+")";
+            names[i]=safeName(d);
         }
         new AlertDialog.Builder(a).setTitle("Eşleşmiş Bluetooth cihazını seç")
             .setItems(names,(dialog,which)->chooseProtocolAndConnect(a,devs.get(which)))
