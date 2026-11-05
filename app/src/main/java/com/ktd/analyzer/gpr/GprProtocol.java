@@ -17,10 +17,14 @@ public final class GprProtocol {
         public final double nsPerSample;
         public final double dxMeters;
         public final String source;
-        Meta(double dt, double dx, String source) {
+        public final double antennaMhz, pulseWidthNs, timeWindowNs;
+        Meta(double dt, double dx, String source, double mhz, double pulseNs, double windowNs) {
             this.nsPerSample = dt;
             this.dxMeters = dx;
             this.source = source;
+            this.antennaMhz = mhz;
+            this.pulseWidthNs = pulseNs;
+            this.timeWindowNs = windowNs;
         }
         public boolean isDemo() { return "DEMO".equalsIgnoreCase(source); }
         public boolean hasPhysicalTime() { return Double.isFinite(nsPerSample) && nsPerSample > 0.0 && !isDemo(); }
@@ -59,18 +63,24 @@ public final class GprProtocol {
         if("META".equalsIgnoreCase(a[1])) {
             // KTDGPR,META,NS_PER_SAMPLE,0.5,DX_M,0.05,SOURCE,FRONTEND
             if(a.length<8 || ((a.length-2)%2)!=0)return null;
-            double dt=Double.NaN, dx=Double.NaN; String source="UNKNOWN";
+            double dt=Double.NaN, dx=Double.NaN, mhz=Double.NaN, pulse=Double.NaN, window=Double.NaN; String source="UNKNOWN";
             try {
                 for(int i=2;i+1<a.length;i+=2){
                     String key=a[i].trim().toUpperCase(java.util.Locale.US);
                     if("NS_PER_SAMPLE".equals(key))dt=Double.parseDouble(a[i+1].trim());
                     if("DX_M".equals(key))dx=Double.parseDouble(a[i+1].trim());
                     if("SOURCE".equals(key))source=a[i+1].trim();
+                    if("ANTENNA_MHZ".equals(key)||"ANTEN_MHZ".equals(key))mhz=Double.parseDouble(a[i+1].trim());
+                    if("PULSE_WIDTH_NS".equals(key))pulse=Double.parseDouble(a[i+1].trim());
+                    if("TIME_WINDOW_NS".equals(key))window=Double.parseDouble(a[i+1].trim());
                 }
             }catch(NumberFormatException bad){return null;}
             if(!(dt>0 && dt<=100000) || !Double.isFinite(dt))dt=Double.NaN;
             if(!(dx>0 && dx<=100) || !Double.isFinite(dx))dx=Double.NaN;
-            return Message.meta(new Meta(dt,dx,source));
+            if(!(mhz>=10 && mhz<=10000))mhz=Double.NaN;
+            if(!(pulse>0 && pulse<10000))pulse=Double.NaN;
+            if(!(window>0 && window<1000000))window=Double.NaN;
+            return Message.meta(new Meta(dt,dx,source,mhz,pulse,window));
         }
         if("STATUS".equalsIgnoreCase(a[1]) || "ADC".equalsIgnoreCase(a[1])) {
             return Message.status(s.substring(s.indexOf(',',s.indexOf(',')+1)+1));

@@ -28,6 +28,7 @@ import com.ktd.analyzer.bluetooth.BluetoothClient;
 import com.ktd.analyzer.data.SensorFrame;
 import com.ktd.analyzer.gpr.GprFileIo;
 import com.ktd.analyzer.gpr.GprProtocol;
+import com.ktd.analyzer.gpr.SignalAutoInfo;
 import com.ktd.analyzer.gpr.HyperbolaEventDetector;
 import com.ktd.analyzer.view.GprRadargramView;
 import com.ktd.analyzer.view.GprTracePanelsView;
@@ -62,6 +63,11 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
     private boolean fileMode=false,playingFile=false;
     private int replayPosition=0, replaySpeed=1;
     private double loadedDxMeters=Double.NaN;
+    private double reportedAntennaMhz=Double.NaN,reportedPulseWidthNs=Double.NaN;
+    private double estimatedAntennaMhz=Double.NaN,estimatedPulseWidthNs=Double.NaN;
+    private double detectedWindowNs=Double.NaN;
+    private int estimateCount=0;
+    private boolean antennaManual=false;
     private int replayPreviewColumns=180;
     private int selectedPalette=1;
     private static final int REPLAY_FRAME_MS=14; // Approx. 2x the previous 29 ms file playback cadence
@@ -107,6 +113,7 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
         com.ktd.analyzer.view.ColorMaps.configure(this);
         selectedPalette=Prefs.palette(this);
         build();
+        updateAutoLabels();
         if(getIntent()!=null && getIntent().getData()!=null)loadUri(getIntent().getData());
     }
     @Override protected void onStart(){
@@ -190,7 +197,7 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
         addRow(control,save,startButton);
         Button stop=action("DURDUR");
         stop.setOnClickListener(v->stopGprFromButton());
-        timeButton=action("ZAMAN");
+        timeButton=action("ZAMAN\n-- ns");
         timeButton.setOnClickListener(v->chooseTime());
         addRow(control,stop,timeButton);
         Button colors=action("RENK");
@@ -205,7 +212,7 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
         LinearLayout paletteRow=new LinearLayout(this);
         paletteRow.addView(colors,new LinearLayout.LayoutParams(-1,dp(36)));
         control.addView(paletteRow,new LinearLayout.LayoutParams(-1,dp(37)));
-        antennaButton=action("ANTEN\n"+antennaMhz+" MHz");
+        antennaButton=action("ANTEN\n-- MHz");
         antennaButton.setOnClickListener(v->chooseAntenna());
         LinearLayout antennaRow=new LinearLayout(this);
         antennaRow.addView(antennaButton,new LinearLayout.LayoutParams(-1,dp(36)));
@@ -282,6 +289,7 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
         if(!BluetoothClient.isConnected()){bluetooth.pickPaired(this);return;}
         stopPlayback();fileMode=false;loadedTraces.clear();
         radar.resetSession();radar.setFastLive(true);radar.setTraceStride(1);hyperbolaDetector.reset();count=0;panels.invalidate();
+        resetDeviceAuto();
         wanted=true;
         if(bluetooth.send("GPR_START\n")){
             running=true;wasDemo=false;
@@ -348,7 +356,7 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
         String[] choices={"Tümü", "30 ns", "60 ns", "100 ns", "150 ns", "200 ns", "300 ns", "500 ns"};
         new AlertDialog.Builder(this).setTitle("ZAMAN").setSingleChoiceItems(choices,timeIndex,(d,selected)->{
             timeIndex=selected;radar.setTimeWindowNs(timeOptions[timeIndex]);
-            timeButton.setText("ZAMAN\n"+(selected==0?"TÜMÜ":choices[selected]));
+            updateAutoLabels();
             panels.invalidate();d.dismiss();
         }).setNegativeButton("İPTAL",null).show();
     }
@@ -364,14 +372,14 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
                 if(value.isEmpty()){
                     timeOverrideNs=Double.NaN;
                     radar.setImportedMeta(lastDeviceNs,radar.getStepMeters(),radar.isDemo());
-                    updateFooter();return;
+                    updateFooter();updateAutoLabels();return;
                 }
                 try{
                     double ns=Double.parseDouble(value);
                     if(!Double.isFinite(ns)||ns<=0||ns>10000)throw new NumberFormatException();
                     timeOverrideNs=ns;
                     radar.setImportedMeta(ns,radar.getStepMeters(),radar.isDemo());
-                    updateFooter();
+                    updateFooter();updateAutoLabels();
                 }catch(NumberFormatException e){Toast.makeText(this,"Geçerli ns/örnek değeri gir",Toast.LENGTH_SHORT).show();}
             }).setNegativeButton("İPTAL",null).show();
     }
@@ -383,10 +391,12 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
         }).show();
     }
     private void chooseAntenna(){
-        String[] options={"100 MHz","200 MHz","300 MHz","400 MHz","500 MHz","800 MHz"};
-        final int[] values={100,200,300,400,500,800};
-        new AlertDialog.Builder(this).setTitle("ANTEN SEÇ").setItems(options,(d,n)->{
-            antennaMhz=values[n];radar.setAntennaMhz(antennaMhz);if(antennaButton!=null)antennaButton.setText("ANTEN\n"+antennaMhz+" MHz");
+        String[] options={"OTOMATİK","100 MHz","200 MHz","300 MHz","400 MHz","500 MHz","800 MHz","BİLGİ"};
+        final int[] values={0,100,200,300,400,500,800,0};
+        new AlertDialog.Builder(this).setTitle("ANTEN / OTOMATİK ANALİZ").setItems(options,(d,n)->{
+            if(n==7){showAutoDiagnostics();return;}
+            if(n==0){antennaManual=false;updateAutoLabels();return;}
+            antennaMhz=values[n];antennaManual=true;radar.setAntennaMhz(antennaMhz);updateAutoLabels();
             // It is a display preset; RF hardware cannot be retuned without a supported command.
         }).show();
     }
@@ -416,6 +426,17 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
                     stopPlayback();
                     loadedTraces.clear();loadedTraces.addAll(rec.traces);
                     fileMode=true;replayPosition=0;count=0;lastDeviceNs=rec.dtNs;loadedDxMeters=rec.dxMeters;
+                    if(Double.isFinite(rec.dielectric) && rec.dielectric>=1 && rec.dielectric<=100){
+                        eps=rec.dielectric;radar.setEpsilon(eps);
+                    }
+                    reportedAntennaMhz=rec.antennaMhz;reportedPulseWidthNs=rec.pulseWidthNs;
+                    estimatedAntennaMhz=Double.NaN;estimatedPulseWidthNs=Double.NaN;estimateCount=0;antennaManual=false;
+                    if(Double.isFinite(rec.dtNs) && !rec.traces.isEmpty()){
+                        SignalAutoInfo.Estimate e=SignalAutoInfo.estimate(rec.traces.get(0).samples,rec.dtNs);
+                        estimatedAntennaMhz=e.dominantMhz;estimatedPulseWidthNs=e.receivedWidthNs;
+                    }
+                    detectedWindowNs=rec.traces.isEmpty()||!Double.isFinite(rec.dtNs)?Double.NaN:rec.traces.get(0).samples.length*rec.dtNs;
+                    updateAutoLabels();
                     radar.resetSession();
                     radar.setImportedMeta(Double.isFinite(timeOverrideNs)?timeOverrideNs:rec.dtNs,rec.dxMeters,false);
                     radar.setFastLive(false);
@@ -473,13 +494,72 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
         ArrayDeque<GprProtocol.Message> packet=new ArrayDeque<>();
         synchronized(guard){while(!queue.isEmpty())packet.addLast(queue.removeFirst());flushScheduled=false;}
         for(GprProtocol.Message m:packet){
-            if(m.meta!=null){lastDeviceNs=m.meta.nsPerSample;radar.setMeta(m.meta);
+            if(m.meta!=null){
+                lastDeviceNs=m.meta.nsPerSample;
+                reportedAntennaMhz=m.meta.antennaMhz;
+                reportedPulseWidthNs=m.meta.pulseWidthNs;
+                detectedWindowNs=m.meta.timeWindowNs;
+                radar.setMeta(m.meta);
                 if(Double.isFinite(timeOverrideNs))radar.setImportedMeta(timeOverrideNs,m.meta.dxMeters,m.meta.isDemo());
-                wasDemo=m.meta.isDemo();}
-            if(m.trace!=null){radar.add(m.trace);count++;alertSignal(m.trace);}
+                wasDemo=m.meta.isDemo();updateAutoLabels();
+            }
+            if(m.trace!=null){
+                if(!wasDemo && estimateCount<3 && Double.isFinite(radar.getSampleIntervalNs())){
+                    SignalAutoInfo.Estimate e=SignalAutoInfo.estimate(m.trace.samples,radar.getSampleIntervalNs());
+                    if(Double.isFinite(e.dominantMhz))estimatedAntennaMhz=e.dominantMhz;
+                    if(Double.isFinite(e.receivedWidthNs))estimatedPulseWidthNs=e.receivedWidthNs;
+                    estimateCount++;
+                    if(!Double.isFinite(detectedWindowNs))detectedWindowNs=radar.getSampleIntervalNs()*m.trace.samples.length;
+                    updateAutoLabels();
+                }
+                radar.add(m.trace);count++;alertSignal(m.trace);
+            }
         }
         panels.invalidate();updateFooter();
     }};
+
+    private void showAutoDiagnostics(){
+        String dt=Double.isFinite(lastDeviceNs)?String.format(Locale.US,"%.6g ns/örnek",lastDeviceNs):"Cihaz bildirmedi";
+        String antenna=Double.isFinite(reportedAntennaMhz)?String.format(Locale.US,"%.0f MHz (cihaz)",reportedAntennaMhz):
+            Double.isFinite(estimatedAntennaMhz)?String.format(Locale.US,"~%.0f MHz (alınan sinyalin spektrumu)",estimatedAntennaMhz):"Bilinmiyor";
+        double pulse=Double.isFinite(reportedPulseWidthNs)?reportedPulseWidthNs:estimatedPulseWidthNs;
+        String width=Double.isFinite(pulse)?String.format(Locale.US,"~%.3f ns (%s)",pulse,
+                Double.isFinite(reportedPulseWidthNs)?"cihaz bildirimi":"alıcı sinyalinin genişliği"):"Bilinmiyor";
+        String dx=Double.isFinite(radar.getStepMeters())?String.format(Locale.US,"%.4f m/iz",radar.getStepMeters()):"Bilinmiyor";
+        new AlertDialog.Builder(this).setTitle("OTOMATİK GPR BİLGİLERİ")
+            .setMessage("Örnekleme: "+dt+"\nAnten: "+antenna+"\nDarbe/sinyal genişliği: "+width+
+                "\nYatay iz aralığı: "+dx+"\n\nBluetooth aktarım hızı ns değildir. " +
+                "Sinyalden bulunan frekans, verici anten frekansının kesin ölçümü değildir. " +
+                "Yatay metre için gerçek iz mesafesi; derinlik için zaman ve zemin kalibrasyonu gerekir.")
+            .setPositiveButton("TAMAM",null).show();
+    }
+    private void resetDeviceAuto(){
+        lastDeviceNs=Double.NaN;reportedAntennaMhz=Double.NaN;reportedPulseWidthNs=Double.NaN;
+        estimatedAntennaMhz=Double.NaN;estimatedPulseWidthNs=Double.NaN;
+        detectedWindowNs=Double.NaN;estimateCount=0;antennaManual=false;
+        updateAutoLabels();
+    }
+    private void updateAutoLabels(){
+        if(timeButton!=null){
+            double dt=Double.isFinite(timeOverrideNs)?timeOverrideNs:lastDeviceNs;
+            if(timeIndex!=0 && Double.isFinite(timeOptions[timeIndex]))
+                timeButton.setText(String.format(Locale.US,"ZAMAN\n%.1f ns",timeOptions[timeIndex]));
+            else if(Double.isFinite(detectedWindowNs))
+                timeButton.setText(String.format(Locale.US,"ZAMAN\n%.2f ns",detectedWindowNs));
+            else if(Double.isFinite(dt))timeButton.setText(String.format(Locale.US,"ZAMAN\n%.4g ns/ör",dt));
+            else timeButton.setText("ZAMAN\n-- ns");
+        }
+        if(antennaButton!=null){
+            if(antennaManual)antennaButton.setText("ANTEN\n"+antennaMhz+" MHz");
+            else if(Double.isFinite(reportedAntennaMhz)){
+                antennaButton.setText(String.format(Locale.US,"ANTEN\n%.0f MHz",reportedAntennaMhz));
+                radar.setAntennaMhz((int)Math.round(reportedAntennaMhz));
+            }else if(Double.isFinite(estimatedAntennaMhz))
+                antennaButton.setText(String.format(Locale.US,"ANTEN ~%.0f MHz",estimatedAntennaMhz));
+            else antennaButton.setText("ANTEN\n-- MHz");
+        }
+    }
+
     private void alertSignal(GprProtocol.Trace t){
         if(t==null||t.samples.length<80)return;
         // A GPR echo hyperbola is not proof of a void or a particular material.

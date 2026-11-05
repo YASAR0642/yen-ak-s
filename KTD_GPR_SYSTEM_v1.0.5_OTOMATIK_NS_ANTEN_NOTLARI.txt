@@ -1,0 +1,30 @@
+KTD GPR SYSTEM v1.0.5 - OTOMATIK GPR META OKUMA
+
+v1.0.4 bagimsiz GPR kaynak kodu uzerinden gelistirilmistir.
+
+- Bluetooth GPR META mesajinda NS_PER_SAMPLE, TIME_WINDOW_NS, DX_M,
+  ANTENNA_MHZ ve PULSE_WIDTH_NS alanlari varsa okunur.
+- Cihazin Bluetooth aktarim hizindan ns ornekleme araligi URETILMEZ.
+- Anten alaninda: cihaz bildirirse ANTEN 450 MHz; bildirmez ama gecerli ns
+  ile spektral tahmin yapilabilirse ANTEN ~188 MHz gibi TAHMIN gosterilir.
+  Bu deger antenin katalog nominal frekansi degil, alinmis izin baskin
+  spektral bilesenidir. Bazen anten frekansini yansitmayabilir.
+- ZAMAN dugmesi bilinen tam zaman penceresini (600 x 0.125 ns = 75 ns)
+  gosterir. Tam pencere yok ama ns/ornek varsa onu gosterir.
+- ANTEN dugmesindeki BILGI: cihaz meta, yaklasik alinan sinyal genisligi,
+  ns/ornek ve m/iz bilgilerini kaynaklariyla acar.
+- Prism (pikosaniye aciklamali) SGY dosyalari pikosaniye -> ns olarak okunur.
+  Ornek dosya: 125 ps = 0.125 ns / ornek.
+- Standart SEG-Y dosyasinda microsecond -> ns; yer tutucu veya dogrulanmamis
+  basliklar gercek zaman olarak kullanilmaz.
+- SEG-Y iz basliklarinda koordinat birimi metre, katsayi ve duzenli aralik
+  varsa X koordinatindan iz arasi metre hesaplanir.
+- Prism basliginda kayitli relatif dielektrik sabiti varsa kullanilir,
+  gercek zemin dielektrigi dogrulanmadan kesin derinlik sayilamaz.
+- Verici anten darbe suresi alici sinyalinden kesin olarak bulunamaz:
+  alinan dalga biciminin yaklasik genisligi gosterilebilir.
+
+Test: Android'den bagimsiz GprProtocol/GprFileIo/SignalAutoInfo Java kodu derlendi.
+20130623_144600(6).SGY dosyasi okunarak 1407 iz, 0.125 ns/ornek,
+75 ns pencere ve 0.001 m/iz hesaplandi.
+Android APK derleme veya sahada anten kalibrasyonu yapilmadi.
