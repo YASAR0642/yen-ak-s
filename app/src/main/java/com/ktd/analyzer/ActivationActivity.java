@@ -51,7 +51,7 @@ public final class ActivationActivity extends Activity {
         logo.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         form.addView(logo, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, Ui.dp(this, 150)));
 
-        TextView title = Ui.text(this, "KTD 3D ANALYZER", 24, Color.WHITE);
+        TextView title = Ui.text(this, "KTD GPR SYSTEM", 24, Color.WHITE);
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         title.setGravity(Gravity.CENTER);
         form.addView(title, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, Ui.dp(this, 48)));
@@ -91,7 +91,7 @@ public final class ActivationActivity extends Activity {
         });
         form.addView(copy, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, Ui.dp(this, 48)));
 
-        TextView actLabel = Ui.text(this, "16 HANELİ AKTİVASYON KODU", 12, Color.rgb(150, 180, 198));
+        TextView actLabel = Ui.text(this, "AKTİVASYON KODU (KTD1)", 12, Color.rgb(150, 180, 198));
         actLabel.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         LinearLayout.LayoutParams alp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, Ui.dp(this, 34));
         alp.setMargins(0, Ui.dp(this, 16), 0, 0);
@@ -100,7 +100,7 @@ public final class ActivationActivity extends Activity {
         codeInput = new EditText(this);
         codeInput.setTextColor(Color.WHITE);
         codeInput.setHintTextColor(Color.rgb(100, 128, 145));
-        codeInput.setHint("16 rakamlı kod (1234-5678-9012-3456)");
+        codeInput.setHint("Mevcut KTD Aktivasyon Yöneticisinden üretilen KTD1 kodunu girin");
         codeInput.setTextSize(13);
         codeInput.setSingleLine(false);
         codeInput.setMinLines(3);
@@ -134,7 +134,12 @@ public final class ActivationActivity extends Activity {
         if (LicenseManager.activate(this, token)) {
             status.setTextColor(Color.rgb(44, 220, 117));
             status.setText("AKTİVASYON BAŞARILI");
-            startActivity(new Intent(this, MainActivity.class));
+            Intent next = new Intent(this, LiveGprActivity.class);
+            if (getIntent() != null && getIntent().getData() != null) {
+                next.setData(getIntent().getData());
+                next.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            }
+            startActivity(next);
             finish();
         } else {
             status.setTextColor(Color.rgb(255, 90, 90));

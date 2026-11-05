@@ -7,6 +7,7 @@
     <application android:allowBackup="false" android:label="KTD GPR SYSTEM"
         android:icon="@drawable/ktd_logo" android:roundIcon="@drawable/ktd_logo"
         android:supportsRtl="true" android:theme="@style/AppTheme">
+        <activity android:name=".ActivationActivity" android:exported="false" android:screenOrientation="unspecified" android:windowSoftInputMode="adjustResize"/>
         <activity android:name=".GprSettingsActivity" android:exported="false" android:screenOrientation="unspecified"/>
         <activity android:name=".LiveGprActivity" android:exported="true" android:screenOrientation="sensorLandscape">
             <intent-filter android:label="KTD GPR SYSTEM ile aç">

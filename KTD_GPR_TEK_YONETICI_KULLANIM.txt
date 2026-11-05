@@ -1,0 +1,22 @@
+KTD GPR SYSTEM v1.0.10 - TEK MEVCUT AKTIVASYON YONETICISI
+
+GPR dosyalari, radargram ve hiperbol ses sistemi v1.0.8 surumunden korunmustur.
+KTD 3D ANALYZER uygulamasina dokunulmamistir.
+YENI AKTIVASYON YONETICISI KURMAYIN.
+
+MEVCUT KTD AKTIVASYON YONETICI v1.0.4 (KTD1 RSA) UYGULAMASIYLA:
+1. GPR uygulamasinin ekranda gosterdigi kendi 16 haneli CIHAZ KODU'nu kopyalayin.
+2. Var olan KTD Aktivasyon Yonetici v1.0.4'e bu 16 haneli GPR cihaz kodunu girin.
+3. Yonetici tarafindan olusturulan KTD1-... kodunu GPR aktivasyon ekranina yapistirin.
+4. GPR'nin aktivasyonu GPR uygulamasinda saklanir; 3D'nin lisans kaydi degismez.
+
+AYRIM:
+- Tek YONETICI uygulamasi vardir; GPR ve 3D icin AYRI cihaz kodu ve lisans uretilir.
+- GPR applicationId: com.ktd.gprsystem (3D'den farkli).
+- GPR cihaz kodu: SHA256('KTDGPR|'+packageName+'|'+ANDROID_ID) ilk 8 bayt.
+- KTD3D cihaz kodu ile GPR cihaz kodu farklidir.
+- Her iki uygulama KTD1 RSA imzali formatini dogrular; imza anahtarinin gizli kismi sadece yonetici uygulamasinda bulunur.
+
+NOT: KTD GPR SYSTEM'in eski KTDG1 tokenleri bu uyumlu modelde kabul edilmez.
+Tek lisans kodu iki uygulamayi acmaz. Tek lisans URETIM uygulamasi kullanilir.
+Android APK build ve telefon uzerinde aktivasyon testi yapilmamistir.

@@ -114,6 +114,17 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
 
     @Override public void onCreate(Bundle state){
         super.onCreate(state);
+        // Guard direct VIEW/SGY intents as well as the launcher entry point.
+        if (!LicenseManager.isActivated(this)) {
+            Intent activation = new Intent(this, ActivationActivity.class);
+            if (getIntent() != null && getIntent().getData() != null) {
+                activation.setData(getIntent().getData());
+                activation.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            }
+            startActivity(activation);
+            finish();
+            return;
+        }
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
         getWindow().setStatusBarColor(Color.rgb(2,14,24));
         getWindow().setNavigationBarColor(Color.rgb(2,14,24));

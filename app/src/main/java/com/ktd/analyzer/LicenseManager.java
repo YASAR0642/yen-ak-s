@@ -16,7 +16,7 @@ import java.util.Locale;
 public final class LicenseManager {
     private LicenseManager() {}
 
-    private static final String PREF = "ktd_license";
+    private static final String PREF = "ktd_gpr_license";
     private static final String KEY_TOKEN = "activation_token";
     private static final String PREFIX = "KTD1";
     private static final String PUBLIC_KEY_B64 =
@@ -26,7 +26,7 @@ public final class LicenseManager {
         try {
             String androidId = Settings.Secure.getString(c.getContentResolver(), Settings.Secure.ANDROID_ID);
             if (androidId == null) androidId = "NO_ANDROID_ID";
-            String src = "KTD3D|" + c.getPackageName() + "|" + androidId;
+            String src = "KTDGPR|" + c.getPackageName() + "|" + androidId;
             byte[] h = MessageDigest.getInstance("SHA-256").digest(src.getBytes(StandardCharsets.UTF_8));
             StringBuilder sb = new StringBuilder();
             for (int i = 0; i < 8; i++) sb.append(String.format(Locale.US, "%02X", h[i]));
@@ -42,11 +42,8 @@ public final class LicenseManager {
 
     public static boolean verify(Context c, String token) {
         if (token == null) return false;
-        String device = deviceCode(c);
-        // New 16-digit license; accept existing 12-digit and RSA activations so
-        // updates do not deactivate customers who are already licensed.
-        if (Activation16Code.verify(device, token)) return true;
-        if (ShortActivationCode.verify(device, token)) return true;
+        // Only RSA licenses from the existing KTD activation manager are accepted.
+        // Device code includes KTDGPR and the distinct package name so KTD 3D licenses cannot match.
         return verifyLegacy(c, token);
     }
 
