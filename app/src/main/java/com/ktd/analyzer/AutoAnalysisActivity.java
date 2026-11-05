@@ -33,7 +33,6 @@ public final class AutoAnalysisActivity extends Activity {
   else {
    double width=data.cols*data.stepCm/100.0;
    double length=data.rows*data.stepCm/100.0;
-   line(content,"Bu cihazdaki 800/Z ters sinyal endeksidir; tekil manyetik olcumden metreyle hedef derinligi belirlenemez.",14);
    line(content,"ÇEKİM ALANI",20);
    line(content,data.cols+" × "+data.rows+" örnek  •  "+fmt(width*length)+" m²",18);
    double ref=com.ktd.analyzer.data.ReferenceInverseDepth.referenceOf(data);
@@ -51,17 +50,16 @@ public final class AutoAnalysisActivity extends Activity {
    // Bağımsız iki sinyal gücü; toplamları 100 olmak zorunda değildir.
    int metal=percent(positive);
    int cavity=percent(negative);
-   line(content,"BOŞLUK YÖNLÜ SİNYAL PUANI",20);
+   line(content,"BOŞLUK OLASILIĞI",20);
    line(content,cavity+"%",28);
    double cavityDepth=com.ktd.analyzer.data.ReferenceMeterModel.meters((float)negativeZ,(float)ref);
-   if(Double.isFinite(cavityDepth))line(content,"Negatif sinyal indeksi (800/Z): "+fmt(cavityDepth)+" — metre değil",17);
-   else line(content,"Negatif eşik üstü sinyal yok.",17);
-   line(content,"POZİTİF / METAL YÖNLÜ SİNYAL PUANI",20);
+   line(content,"BOŞLUK DERİNLİĞİ",20);
+   line(content,Double.isFinite(cavityDepth)?fmt(cavityDepth)+" m":"—",23);
+   line(content,"METAL OLASILIĞI",20);
    line(content,metal+"%",28);
    double metalDepth=com.ktd.analyzer.data.ReferenceMeterModel.meters((float)positiveZ,(float)ref);
-   if(Double.isFinite(metalDepth))line(content,"Pozitif sinyal indeksi (800/Z): "+fmt(metalDepth)+" — metre değil",17);
-   else line(content,"Pozitif eşik üstü sinyal yok.",17);
-   line(content,"Gerçek hedef derinliği: mevcut manyetik ölçümlerle doğrulanmadı.",16);
+   line(content,"METAL DERİNLİĞİ",20);
+   line(content,Double.isFinite(metalDepth)?fmt(metalDepth)+" m":"—",23);
   }
   scroll.addView(content);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
   setContentView(root);Ui.applySafeInsets(this,root);

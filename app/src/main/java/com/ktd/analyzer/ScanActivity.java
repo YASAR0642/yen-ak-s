@@ -425,7 +425,8 @@ public final class ScanActivity extends Activity implements BluetoothClient.List
         SensorFrame stored=serialStream?
             new SensorFrame(Float.NaN,Float.NaN,rawSignal,f.channelC()):frame;
         data.put(q[0],q[1],stored,ref.visualDelta(rawSignal));
-        // C = 800/Z is a derived signal index, not measured metres.
+        // Explicit A1/A2 frames use the 30 cm gradient as a baseline-centered
+        // display signal. Legacy Nano scalar frames remain unchanged.
         if(Float.isFinite(rawSignal)&&rawSignal>0f){data.c[q[0]][q[1]]=com.ktd.analyzer.data.InverseSignalIndex.fromRaw(rawSignal);data.depth[q[0]][q[1]]=Float.NaN;data.cIsDerivedFromRaw=true;data.derivedCDivisor=800;}
         NeutralExperimentalDepth.apply(data);
         index++;

@@ -38,7 +38,11 @@ public final class SensorStreamDecoder {
         }
     }
     private void drainNumeric(List<SensorFrame> out){
-        String up=pending.toString().toUpperCase();if(up.indexOf('X')>=0||up.indexOf('Y')>=0||up.indexOf('Z')>=0||up.indexOf('C')>=0)return;
+        String up=pending.toString().toUpperCase();
+        // An unfinished A1/A2 packet must wait for newline, not be split into
+        // accidental numeric frames (e.g. "1,512,2,510").
+        if(up.contains("A1=")||up.contains("A2=")||up.contains("A1:")||up.contains("A2:"))return;
+        if(up.indexOf('X')>=0||up.indexOf('Y')>=0||up.indexOf('Z')>=0||up.indexOf('C')>=0)return;
         if(pending.indexOf(";")>=0){while(extract(out,';')){}return;}
         if(pending.indexOf(",")>=0){while(extract(out,',')){}return;}
         while(true){Matcher m=NUMBER.matcher(pending);int n=0,cut=-1;while(m.find()){n++;if(n==5){cut=m.start();break;}}if(cut<0)return;String one=pending.substring(0,cut).trim();pending.delete(0,cut);add(out,one);}

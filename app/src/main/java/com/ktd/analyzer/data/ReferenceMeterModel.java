@@ -6,7 +6,7 @@ package com.ktd.analyzer.data;
  *
  * R: baseline measured at the start of the SAME scan (not nominal 512).
  * delta=raw-R. Positive and negative headroom are normalized separately:
- * Zrelative = 1023 * abs(delta) / (delta >= 0 ? 1023-R : R).
+ * Zrelative = abs(delta) (minimum 15 ADC counts).
  * depthIndex = 800 / Zrelative.
  *
  * 15 raw counts is the GMR display threshold; below it there is no anomaly.
@@ -22,10 +22,7 @@ public final class ReferenceMeterModel {
         if(!Float.isFinite(raw)||!Float.isFinite(reference)||reference<=0f||reference>=ADC_RANGE)return Float.NaN;
         float delta=raw-reference;
         if(Math.abs(delta)<ANOMALY_THRESHOLD)return Float.NaN;
-        float headroom=delta>=0f?ADC_RANGE-reference:reference;
-        if(headroom<=0f)return Float.NaN;
-        float normalized=ADC_RANGE*Math.abs(delta)/headroom;
-        return normalized>0f?normalized:Float.NaN;
+        return Math.abs(delta);
     }
     public static float meters(float raw,float reference){
         float z=normalizedSignal(raw,reference);

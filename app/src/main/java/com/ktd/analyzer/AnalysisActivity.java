@@ -149,14 +149,14 @@ public final class AnalysisActivity extends Activity {
         LinearLayout all=new LinearLayout(this);all.setGravity(Gravity.CENTER_VERTICAL);
         all.setPadding(Ui.dp(this,10),Ui.dp(this,2),Ui.dp(this,10),Ui.dp(this,2));
         all.setBackgroundColor(Color.rgb(10,24,32));
-        levelLabel=Ui.text(this,"Görsel seviye: Tümü",12,Color.WHITE);
+        levelLabel=Ui.text(this,"Derinlik: Tümü",12,Color.WHITE);
         Ui.fitText(levelLabel,10,13,1);
         levelSeek=new SeekBar(this);levelSeek.setMax(100);levelSeek.setProgress(0);
         levelSeek.setOnSeekBarChangeListener(simple(p->{
             boolean available=visualData!=null&&visualData.hasDepthData();
             float maxDepth=available?visualData.maxDepthMeters():hasModelDepth()?modelMaxDepth():0f;
             // Surgu, ters sinyalden turetilen C indeksinde fiziksel metre degildir.
-            depthSliceMeters=(!available||p==0)?0f:maxDepth*p/100f;
+            depthSliceMeters=(!available||p==0)?0f:Math.min(maxDepth,Math.max(.5f,Math.round((maxDepth*p/100f)*2f)/2f));
             if(showing4D){
                 if(volume4d!=null)volume4d.setDepthFocusMeters(depthSliceMeters);
             }else{
@@ -176,14 +176,8 @@ public final class AnalysisActivity extends Activity {
         if(levelSeek!=null)levelSeek.setEnabled(available);
         if(levelLabel==null)return;
         if(!available&&!modelReady){levelLabel.setText("Z: goreli hacim");return;}
-        if(depthSliceMeters<=0f){levelLabel.setText(derived?"C indeksi: Tumu":"Derinlik: Tumu");return;}
-        if(derived){
-            float max=visualData.maxDepthMeters();
-            float relative=max>0f?100f*depthSliceMeters/max:0f;
-            levelLabel.setText(String.format(Locale.forLanguageTag("tr-TR"),"C katmani: %.0f%%",relative));
-        }else{
-            levelLabel.setText(String.format(Locale.forLanguageTag("tr-TR"),"%.2f m",depthSliceMeters));
-        }
+        if(depthSliceMeters<=0f){levelLabel.setText("Derinlik: Tümü");return;}
+        levelLabel.setText(String.format(Locale.forLanguageTag("tr-TR"),"Derinlik: %.1f m",depthSliceMeters));
     }
 
     private boolean hasModelDepth(){

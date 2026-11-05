@@ -144,16 +144,14 @@ public final class AxisOverlayView extends View {
         if(volumeMode){
             float[] ez=project(ox,oy,-zExtent);
             if(!visible(ez))return;
-            if(data.rulerDerivedDepth)drawRelativeVolumeAxis(c,o,ez,Z_BLUE);
-            else drawDepthAxis(c,o,ez,Z_BLUE,data.maxDepthMeters());
+            drawDepthAxis(c,o,ez,Z_BLUE,data.maxDepthMeters());
             p.setStyle(Paint.Style.FILL);p.setFakeBoldText(true);p.setTextAlign(Paint.Align.RIGHT);
             p.setTextSize(sp(10.5f));p.setColor(Z_BLUE);p.setAlpha(255);
             c.drawText("0",o[0]-dp(5),o[1]-dp(5),p);p.setFakeBoldText(false);
         }else{
             float[] ez=project(ox,oy,-zExtent);
             if(!visible(ez))return;
-            if(data.rulerDerivedDepth)drawRelativeVolumeAxis(c,o,ez,Z_BLUE);
-            else drawDepthAxis(c,o,ez,Z_BLUE,data.maxDepthMeters());
+            drawDepthAxis(c,o,ez,Z_BLUE,data.maxDepthMeters());
             p.setStyle(Paint.Style.FILL);p.setFakeBoldText(true);p.setTextAlign(Paint.Align.RIGHT);
             p.setTextSize(sp(10.5f));p.setColor(Z_BLUE);p.setAlpha(255);
             c.drawText("0",o[0]-dp(5),o[1]-dp(5),p);p.setFakeBoldText(false);
@@ -240,7 +238,7 @@ public final class AxisOverlayView extends View {
         float ux=dx/len,uy=dy/len,nx=-uy,ny=ux;
         p.setStyle(Paint.Style.STROKE);p.setStrokeCap(Paint.Cap.ROUND);p.setStrokeWidth(dp(2.5f));p.setColor(color);p.setAlpha(250);c.drawLine(a[0],a[1],b[0],b[1],p);drawArrow(c,b[0],b[1],ux,uy,color);
         if(maxDepth>0f){
-            float step=niceDepthStep(maxDepth);
+            float step=maxDepth<=8f?.5f:niceDepthStep(maxDepth);
             p.setStrokeWidth(dp(1.15f));p.setTextSize(sp(9.5f));p.setTextAlign(Paint.Align.CENTER);p.setColor(color);
             for(float d=step;d<=maxDepth+1e-4f;d+=step){
                 float t=Math.min(1f,d/maxDepth),x=a[0]+dx*t,y=a[1]+dy*t,tick=dp(4.5f);
@@ -248,7 +246,7 @@ public final class AxisOverlayView extends View {
                 c.drawText(fmtDepth(d),x+nx*dp(22f),y+ny*dp(22f)+sp(3f),p);
             }
         }
-        p.setStyle(Paint.Style.FILL);p.setTextSize(sp(12.5f));p.setFakeBoldText(true);p.setTextAlign(Paint.Align.CENTER);p.setColor(color);p.setAlpha(255);c.drawText(data!=null&&data.rulerDerivedDepth?"Z (göreli)":"Z",b[0]+ux*dp(12f),b[1]+uy*dp(12f)+sp(4f),p);p.setFakeBoldText(false);
+        p.setStyle(Paint.Style.FILL);p.setTextSize(sp(12.5f));p.setFakeBoldText(true);p.setTextAlign(Paint.Align.CENTER);p.setColor(color);p.setAlpha(255);c.drawText("Z (m)",b[0]+ux*dp(12f),b[1]+uy*dp(12f)+sp(4f),p);p.setFakeBoldText(false);
     }
 
     private static float niceDepthStep(float max){

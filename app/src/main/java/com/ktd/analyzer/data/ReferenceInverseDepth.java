@@ -6,7 +6,7 @@ import java.util.Collections;
 /**
  * Ortam referansina gore iki yonlu normalize edilen proje derinlik indeksi.
  * R = taramanin ilk referansi, delta = hamZ-R.
- * Z_ref=1023*|delta|/(delta>=0 ? 1023-R : R), proje indeksi=800/Z_ref.
+ * Z_ref=|delta|, proje indeksi=800/Z_ref (|delta| >= 15).
  * Bu fiziksel derinlik degildir. CSV ham Z/C kayitlari degistirilmez.
  */
 public final class ReferenceInverseDepth {
@@ -96,15 +96,11 @@ public final class ReferenceInverseDepth {
     public static ScanData createRelativeIndexVolume(ScanData original){
         if(original==null)return null;
         ScanData out=createVisualDepth(original);
+        // Referans farkinin tersine dayanan ayni C=800/|Z-R| konumu.
+        // 2D, 3D, 4D ve analiz ayni referans temelli formulu kullanir.
         for(int r=0;r<out.rows;r++)for(int c=0;c<out.cols;c++){
-            // 800/Z is an uncalibrated SIGNAL INDEX, not metres.
-            // For 3D/4D only, map the index monotonically to a 0..10
-            // VISUAL LEVEL so weak magnetic differences cannot create
-            // fictitious 20-40 metre depth readings.
-            float index=ReferenceMeterModel.meters(out.raw[r][c],out.reference);
-            float level=Float.isFinite(index) && index>=0f
-                    ?10f*index/(10f+index):Float.NaN;
-            out.depth[r][c]=out.filled[r][c] ? level : Float.NaN;
+            float estimate=ReferenceMeterModel.meters(out.raw[r][c],out.reference);
+            out.depth[r][c]=out.filled[r][c] ? estimate : Float.NaN;
         }
         out.cIsDerivedFromRaw=true;
         out.derivedCDivisor=800;

@@ -13,6 +13,8 @@ public final class SensorParser {
             "(?i).*?X\\s*[:=]\\s*"+N+".*?Y\\s*[:=]\\s*"+N+".*?Z\\s*[:=]\\s*"+N+".*?C\\s*[:=]\\s*"+N+".*");
     private static final Pattern ZC_LABELED = Pattern.compile(
             "(?i).*?Z\\s*[:=]\\s*"+N+".*?C\\s*[:=]\\s*"+N+".*");
+    private static final Pattern A1_FIELD=Pattern.compile("(?i)(?:^|[^A-Z0-9])A1\\s*[:=]\\s*"+N);
+    private static final Pattern A2_FIELD=Pattern.compile("(?i)(?:^|[^A-Z0-9])A2\\s*[:=]\\s*"+N);
     private static final Pattern ADC10_FIELD = Pattern.compile("(?i)\\bADC10\\s*[:=]\\s*(\\d{1,4})");
     private static final Pattern REF_VALUE = Pattern.compile(
             "(?i)^(?:REF|REFERENCE|REFERANS|ZERO|SIFIR)\\s*[:=]\\s*"+N+"\\s*$");
@@ -26,6 +28,12 @@ public final class SensorParser {
 
     public static SensorFrame parse(String line){
         if(line==null)return null;String s=line.trim();if(s.isEmpty())return null;
+        // A1/A2 must be explicit: do NOT infer two channels from legacy scalar or X/Y/Z/C.
+        Matcher ma1=A1_FIELD.matcher(s),ma2=A2_FIELD.matcher(s);
+        if(ma1.find()&&ma2.find()){
+            try{return SensorFrame.dualAdc(f(ma1.group(1)),f(ma2.group(1)));}
+            catch(Exception ignored){return null;}
+        }
         Matcher rm=REF_VALUE.matcher(s);
         if(rm.matches()){
             try{return SensorFrame.reference(f(rm.group(1)));}catch(Exception ignored){}
