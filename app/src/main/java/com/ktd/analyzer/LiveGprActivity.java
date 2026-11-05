@@ -165,17 +165,6 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
         LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(Color.rgb(5,15,23));root.setPadding(dp(4),dp(3),dp(4),dp(3));
         LinearLayout head=new LinearLayout(this);head.setGravity(Gravity.CENTER_VERTICAL);
-        Button back=action("AYARLAR");back.setOnClickListener(v->{
-            Intent settings=new Intent(this,GprSettingsActivity.class);
-            if(fileMode&&!loadedTraces.isEmpty()){
-                settings.putExtra("gpr_file_key",loadedFileKey);
-                settings.putExtra("gpr_trace_count",loadedTraces.size());
-                settings.putExtra("gpr_header_distance",Double.isFinite(loadedDxMeters)?
-                    loadedDxMeters*(loadedTraces.size()-1):Double.NaN);
-            }
-            startActivity(settings);
-        });
-        head.addView(back,new LinearLayout.LayoutParams(dp(92),dp(38)));
         TextView title=text("KTD GPR SYSTEM",20);title.setGravity(Gravity.CENTER_VERTICAL);title.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
         head.addView(title,new LinearLayout.LayoutParams(0,dp(40),1));
         connection=text("○ BLUETOOTH",11);connection.setBackground(Ui.bg(NAVY,6,this));
@@ -205,18 +194,28 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
             public void onStopTrackingTouch(SeekBar b){}
         });
         lineGain.addView(slider,new LinearLayout.LayoutParams(0,-1,1));
-        middle.addView(lineGain,new LinearLayout.LayoutParams(-1,dp(43)));
+        // G1..G5 cover exactly the radargram depth plot from 28dp to height-8dp.
+        middle.addView(lineGain,new LinearLayout.LayoutParams(-1,dp(28)));
         middle.addView(panels,new LinearLayout.LayoutParams(-1,0,1));
+        View gainBottomInset=new View(this);
+        middle.addView(gainBottomInset,new LinearLayout.LayoutParams(-1,dp(8)));
         body.addView(middle,weighted(20));
 
         LinearLayout control=new LinearLayout(this);control.setPadding(dp(3),dp(3),dp(3),dp(3));
         control.setOrientation(LinearLayout.VERTICAL);
-        Button createColor=action("RENK OLUŞTUR");
-        createColor.setOnClickListener(v->CustomPaletteEditor.show(this,()->{
-            com.ktd.analyzer.view.ColorMaps.configure(this);
-            selectedPalette=Prefs.palette(this);
-            radar.setPalette(selectedPalette);
-        }));
+        // AYARLAR lives in the first right-hand button, never over the radar title.
+        // The Settings screen includes creation, editing, saving and deleting 10-stop palettes.
+        Button createColor=action("AYARLAR");
+        createColor.setOnClickListener(v->{
+            Intent settings=new Intent(this,GprSettingsActivity.class);
+            if(fileMode&&!loadedTraces.isEmpty()){
+                settings.putExtra("gpr_file_key",loadedFileKey);
+                settings.putExtra("gpr_trace_count",loadedTraces.size());
+                settings.putExtra("gpr_header_distance",Double.isFinite(loadedDxMeters)?
+                    loadedDxMeters*(loadedTraces.size()-1):Double.NaN);
+            }
+            startActivity(settings);
+        });
         Button open=action("DOSYA AÇ");
         open.setOnClickListener(v->openFile());
         addRow(control,createColor,open);

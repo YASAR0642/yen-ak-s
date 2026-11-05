@@ -27,7 +27,7 @@ public final class GprRadargramView extends View {
     private int nSamples=0, maxAbsolute=100, filterMode=0, palette=0;
     private double dtNs=Double.NaN, dxMeters=Double.NaN, epsilonR=9, timeWindowNs=Double.NaN;
     private float gain=1f;
-    private final float[] depthGains={1f,1f,1f,1f};
+    private final float[] depthGains={1f,1f,1f,1f,1f};
     private int antennaMhz=300;
     private boolean estimatedTime=false;
     private boolean demo=false, hyperbolicContrast=false, autoContrast=true;
@@ -77,8 +77,8 @@ public final class GprRadargramView extends View {
     public void resetSession(){clear();dtNs=Double.NaN;dxMeters=Double.NaN;demo=false;maxAbsolute=100;invalidate();}
     public void setGain(float value){gain=Math.max(0f,Math.min(10f,value));invalidate();}
     public float getGain(){return gain;}
-    public void setDepthGain(int section,float value){if(section>=0&&section<4){depthGains[section]=Math.max(0f,Math.min(10f,value));invalidate();}}
-    public float getDepthGain(int section){return depthGains[Math.max(0,Math.min(3,section))];}
+    public void setDepthGain(int section,float value){if(section>=0&&section<5){depthGains[section]=Math.max(0f,Math.min(10f,value));invalidate();}}
+    public float getDepthGain(int section){return depthGains[Math.max(0,Math.min(4,section))];}
     public void setAntennaMhz(int mhz){antennaMhz=mhz;invalidate();}
     public void setEstimatedTime(boolean value){estimatedTime=value;invalidate();}
     public void setEpsilon(double value){epsilonR=Math.max(1,Math.min(50,value));invalidate();}
@@ -176,7 +176,7 @@ public final class GprRadargramView extends View {
                     double a0=sampled[Math.max(0,x-1)][y],a1=sampled[Math.min(visibleN-1,x+1)][y];
                     a+=(a-(a0+a1)*.5)*.48;
                 }
-                int section=Math.min(3,(int)((long)y*4/rows));
+                int section=Math.min(4,(int)((long)y*5/rows));
                 float localGain=depthGains[section];
                 double response=a/scale*localGain;
                 pixels[y*visibleN+x]=(gain<=0.0001f || localGain<=0.0001f ? Color.rgb(128,128,128) : shade(response));

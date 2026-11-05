@@ -1,0 +1,10 @@
+KTD GPR SYSTEM v1.0.7
+Baz: v1.0.6
+- Ust soldaki AYARLAR butonu kaldirildi; baslik tam genislikte.
+- Sagda eski RENK OLUSTUR yazan ilk dugme AYARLAR oldu.
+- Renk olusturma, 10 nokta, kayitli palet duzenleme ve silme Ayarlar icinde.
+- GPR radargram kazanc bantlari G1,G2,G3,G4,G5 oldu.
+- 5 es kazanc bandi radargramdaki 5 es derinlik araligina denk gelir.
+- Sag G1-G5 paneli dikeyde radargramin metre ekseniyle hizalandi.
+- Radargram, SGY, Bluetooth, hesaplamalar ve filtreler aynen korundu.
+- Android derleme ve gercek cihaz testi yapilmadi.
