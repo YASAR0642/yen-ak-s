@@ -28,6 +28,7 @@ import com.ktd.analyzer.bluetooth.BluetoothClient;
 import com.ktd.analyzer.data.SensorFrame;
 import com.ktd.analyzer.gpr.GprFileIo;
 import com.ktd.analyzer.gpr.GprProtocol;
+import com.ktd.analyzer.gpr.HyperbolaEventDetector;
 import com.ktd.analyzer.view.GprRadargramView;
 import com.ktd.analyzer.view.GprTracePanelsView;
 import java.io.InputStream;
@@ -56,13 +57,14 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
     private float gain=1f;
     private int antennaMhz=300,filter=0,timeIndex=0,soundTone=0;
     private long count=0,lastAudio=0;
+    private final HyperbolaEventDetector hyperbolaDetector=new HyperbolaEventDetector();
     private final ArrayList<GprProtocol.Trace> loadedTraces=new ArrayList<>();
     private boolean fileMode=false,playingFile=false;
     private int replayPosition=0, replaySpeed=1;
     private double loadedDxMeters=Double.NaN;
     private int replayPreviewColumns=180;
     private int selectedPalette=1;
-    private static final int REPLAY_FRAME_MS=29; // 25% faster playback: 40/1.25
+    private static final int REPLAY_FRAME_MS=14; // Approx. 2x the previous 29 ms file playback cadence
     // Bluetooth input is drained in short batches; display memory stays bounded.
     private static final int MAX_PENDING_MESSAGES=4096;
     private long droppedGprMessages=0;
@@ -112,7 +114,7 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
         wanted=false;
         if(running&&BluetoothClient.isConnected())bluetooth.send("GPR_STOP\n");
         running=false;BluetoothClient.stopGprLines(this);bluetooth.release();
-        ui.removeCallbacks(flush);ui.removeCallbacks(replayTick);playingFile=false;synchronized(guard){queue.clear();flushScheduled=false;}
+        ui.removeCallbacks(flush);ui.removeCallbacks(replayTick);playingFile=false;hyperbolaDetector.reset();synchronized(guard){queue.clear();flushScheduled=false;}
         super.onStop();
     }
     @Override protected void onResume(){super.onResume();com.ktd.analyzer.view.ColorMaps.configure(this);selectedPalette=Prefs.palette(this);if(radar!=null)radar.setPalette(selectedPalette);}
@@ -144,6 +146,7 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
 
         LinearLayout body=new LinearLayout(this);body.setOrientation(LinearLayout.HORIZONTAL);
         radar=new GprRadargramView(this);
+        radar.setFastLive(true);
         radar.setPalette(selectedPalette);
         radar.setHyperbolaEnhance(hyperbola);
         radar.setEpsilon(eps);
@@ -229,8 +232,11 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
         if(!fileMode||loadedTraces.isEmpty()){Toast.makeText(this,"Önce bir SGY/CSV dosyası açın",Toast.LENGTH_SHORT).show();return;}
         stopPlayback();
         if(fromBeginning||replayPosition==0||replayPosition>=loadedTraces.size()){
+            hyperbolaDetector.reset();
             replayPosition=0;count=0;radar.resetSession();panels.invalidate();
             radar.setImportedMeta(Double.isFinite(timeOverrideNs)?timeOverrideNs:lastDeviceNs,loadedDxMeters,false);
+            radar.setFastLive(false);
+            radar.setTraceStride(loadedTraces.size()/(double)Math.max(1,Math.min(180,loadedTraces.size())));
         }
         playingFile=true;refreshReplayButtons();ui.post(replayTick);updateFooter();
     }
@@ -252,7 +258,7 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
     private void start(){
         if(!BluetoothClient.isConnected()){bluetooth.pickPaired(this);return;}
         stopPlayback();fileMode=false;loadedTraces.clear();
-        radar.resetSession();count=0;panels.invalidate();
+        radar.resetSession();radar.setFastLive(true);radar.setTraceStride(1);hyperbolaDetector.reset();count=0;panels.invalidate();
         wanted=true;
         if(bluetooth.send("GPR_START\n")){
             running=true;wasDemo=false;
@@ -272,13 +278,13 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
             return;
         }
         if(running){bluetooth.send("GPR_STOP\n");}
-        wanted=false;running=false;
+        wanted=false;running=false;hyperbolaDetector.reset();
         refreshReplayButtons();
         updateFooter();
     }
     private void toggle(){
         if(fileMode){if(playingFile){stopPlayback();refreshReplayButtons();updateFooter();}else startReplay(false);return;}
-        if(running){wanted=false;running=false;bluetooth.send("GPR_STOP\n");startButton.setText("BAŞLAT");}
+        if(running){wanted=false;running=false;hyperbolaDetector.reset();bluetooth.send("GPR_STOP\n");startButton.setText("BAŞLAT");}
         else start();
     }
     private void extraMenu(){
@@ -289,7 +295,7 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
     }
     private void demo(){
         if(!BluetoothClient.isConnected()){bluetooth.pickPaired(this);return;}
-        radar.resetSession();count=0;
+        radar.resetSession();hyperbolaDetector.reset();count=0;
         if(bluetooth.send("GPR_DEMO_START\n")){
             wanted=true;running=true;wasDemo=true;startButton.setText("ÇALIŞIYOR");
         }
@@ -304,7 +310,7 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
             }).setNegativeButton("İPTAL",null).show();
     }
     private void showFullPreview(){
-        radar.resetSession();count=0;
+        radar.resetSession();radar.setFastLive(false);radar.setTraceStride(loadedTraces.size()/(double)Math.max(1,Math.min(180,loadedTraces.size())));count=0;
         radar.setImportedMeta(Double.isFinite(timeOverrideNs)?timeOverrideNs:lastDeviceNs,loadedDxMeters,false);
         // Complete recording is represented in the fixed-width preview without dropping its timeline.
         int total=loadedTraces.size();
@@ -389,6 +395,8 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
                     fileMode=true;replayPosition=0;count=0;lastDeviceNs=rec.dtNs;loadedDxMeters=rec.dxMeters;
                     radar.resetSession();
                     radar.setImportedMeta(Double.isFinite(timeOverrideNs)?timeOverrideNs:rec.dtNs,rec.dxMeters,false);
+                    radar.setFastLive(false);
+                    hyperbolaDetector.reset();
                     // Opening a file must only preview the whole recording. PLAY begins acquisition-style replay.
                     showFullPreview();refreshReplayButtons();
                     Toast.makeText(this,"Dosya hazır: "+loadedTraces.size()+" iz. BAŞLAT ile oynat.",Toast.LENGTH_LONG).show();
@@ -450,14 +458,17 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
         panels.invalidate();updateFooter();
     }};
     private void alertSignal(GprProtocol.Trace t){
-        if(tone==null||t.samples.length<16)return;
-        long now=SystemClock.elapsedRealtime();if(now-lastAudio<2400)return;
-        long sum=0;int max=0;
-        for(short v:t.samples){sum+=Math.abs((int)v);max=Math.max(max,Math.abs((int)v));}
-        if(max>100&&max>3.8*(sum/(double)t.samples.length)){
-            lastAudio=now;
-            if(voiceGuide!=null && getSharedPreferences("gpr_options",0).getBoolean("voice",true))voiceGuide.say("Güçlü yansıma anomalisi");
-            try{tone.startTone(soundTone==0?ToneGenerator.TONE_PROP_BEEP:soundTone==1?ToneGenerator.TONE_PROP_ACK:ToneGenerator.TONE_PROP_NACK,100);}catch(Exception ignored){}
-        }
+        if(t==null||t.samples.length<80)return;
+        // A GPR echo hyperbola is not proof of a void or a particular material.
+        if(!hyperbolaDetector.accept(t))return;
+        // Only real traces or genuine file records, never device demo modes.
+        if(!fileMode && (wasDemo||radar.isDemo()))return;
+        long now=SystemClock.elapsedRealtime();
+        if(now-lastAudio<1200)return;
+        lastAudio=now;
+        if(voiceGuide!=null && getSharedPreferences("gpr_options",0).getBoolean("voice",true))
+            voiceGuide.say("Olası boşluk anomalisi");
+        if(tone!=null)try{tone.startTone(ToneGenerator.TONE_PROP_BEEP,95);}catch(Exception ignored){}
     }
+
 }

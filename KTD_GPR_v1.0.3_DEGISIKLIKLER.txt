@@ -1,0 +1,16 @@
+KTD GPR SYSTEM v1.0.3 – canli GPR radargram
+
+- Yerlesim, mevcut radargram, dugmeler ve renk ayarlari korunmustur.
+- Radargram ust bandina ILERLEME metraj bilgisi eklenmistir.
+- X metre bilgisi yalniz gercek DX_M iz adimi metadatasi varsa hesaplanir.
+- Dokununca arti imleci ve X metre / tahmini Z metre gostergesi gelir.
+- Kalibrasyon eksikse fiziksel metre uydurulmaz.
+- Canli yatay goruntu penceresi 180 yerine 90 iz: olcum basina gorsel ilerleme 2 kat.
+- SGY dosya oynatma dongusu 29 ms yerine 14 ms olarak ayarlanmistir.
+- 17 izlik pencere uzerinde hiperbol benzeri geometriyi arayan olay denetleyicisi eklendi.
+- Her olay icin tek kisa olasi-bosluk sesli uyari; tekrar baskilama: 22 iz.
+- Kesin bosluk/malzeme tanisi yapmaz; hiperbol yalniz yansitici bir hedefi isaret edebilir.
+
+DOGRULAMA:
+- Java GprProtocol + HyperbolaEventDetector derlendi ve sentetik kavis testinde tek olay uyarisi alindi.
+- Android APK/GitHub Actions derlemesi ve gercek cihaz testi burada yapilmadi.
