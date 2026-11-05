@@ -8,8 +8,8 @@ android {
         applicationId 'com.ktd.gprsystem'
         minSdk 23
         targetSdk 35
-        versionCode 1009
-        versionName '1.0.9-gpr-activation'
+        versionCode 1011
+        versionName '1.0.11-single-admin-diagnostic'
     }
 
     buildTypes {

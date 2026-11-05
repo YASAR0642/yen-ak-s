@@ -1,0 +1,9 @@
+KTD GPR SYSTEM v1.0.11
+- Mevcut v1.0.4 KTD Aktivasyon Yoneticisi degistirilmedi.
+- RSA anahtar eslesmesi dogrulandi.
+- Aktivasyon hata nedeni artik kullaniciya ayrintili gosterilir.
+- Kod panodan yapistirilabilir.
+- Bosluk/satir sonlari temizlenir; imza ve cihaz eslestirmesi gevsetilmez.
+- Ayrı uygulama kimligi com.ktd.gprsystem korunur.
+- Eski KTD 3D aktivasyonlari degistirilmez.
+- GPR uygulamasinin cihaz kodu ile YENI KTD1 kodu uretilmelidir.

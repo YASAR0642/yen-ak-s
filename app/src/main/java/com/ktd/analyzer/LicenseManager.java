@@ -18,7 +18,7 @@ public final class LicenseManager {
 
     private static final String PREF = "ktd_gpr_license";
     private static final String KEY_TOKEN = "activation_token";
-    private static final String PREFIX = "KTDG1";
+    private static final String PREFIX = "KTD1";
     private static final String PUBLIC_KEY_B64 =
             "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAr6q8UzcE9Wwj+g+zuNF7pYN4BSVJleOA8NTHjYviAjJvMNUZ/GzU1mIfBOY9GWXTrpaUfPcFyhTKiwYgRR04RlM/RAkqnS56Uz9h7u3Nu6gTC1AC+vurCSV8OqQsN5TjLKidsJoL809/4iQBADWcF7pNtWWBssn8uN2oBo2sK6zRsyIC43lYGzNf3b77bCJjm6ADkM/BL1N5lx7CfGhSQQ/xkUzMZo1uxIZ6Lya1w6+Dqrv9iQNio4LkLMEcwIOhmOS2jgJRX3ocnisPu+MAEtHFUP6N+HnQ7brhLaKFOGncfckZ4SO00tMZiLzprxmawCyyxogMyYD2/wCzBjgpewIDAQAB";
 
@@ -37,33 +37,52 @@ public final class LicenseManager {
     }
 
     private static String payload(Context c) {
-        return "KTDGPR|" + deviceCode(c) + "|LIFETIME";
+        return "KTD|" + deviceCode(c) + "|LIFETIME";
     }
 
-    public static boolean verify(Context c, String token) {
-        if (token == null) return false;
-        // GPR accepts only GPR-scoped RSA tokens: no shared HMAC keys in the APK.
-        return verifyLegacy(c, token);
-    }
-
-    private static boolean verifyLegacy(Context c, String token) {
-        if (token == null) return false;
-        token = token.trim();
-        String[] p = token.split("-", 3);
-        if (p.length != 3 || !PREFIX.equals(p[0])) return false;
-        String device = p[1].trim().toUpperCase(Locale.US);
-        if (!device.equals(deviceCode(c))) return false;
+    /**
+     * Lisans dogrulama nedenini ayri donderir. Basarili sonuc yalnizca
+     * RSA imzasi ve BU uygulamanin cihaz kodu tam eslesirse verilir.
+     */
+    public static String validationError(Context c, String rawToken) {
+        if (rawToken == null || rawToken.trim().isEmpty())
+            return "Aktivasyon kodunu girin veya panodan yapistirin.";
+        String token = cleanToken(rawToken);
+        if (!token.startsWith(PREFIX + "-"))
+            return "Kod KTD1- ile baslamali. Mevcut KTD Aktivasyon Yoneticisi v1.0.4 ile yeni kod uretin.";
+        String[] parts = token.split("-", 3);
+        if (parts.length != 3 || !parts[1].matches("[0-9A-F]{16}") || parts[2].isEmpty())
+            return "Kod bicimi eksik veya bozulmus. Yoneticide KOPYALA secenegini kullanin.";
+        String localDevice = deviceCode(c);
+        if (!localDevice.equals(parts[1]))
+            return "Farkli cihaz kodu: Lisans " + parts[1]
+                    + " icin uretilmis; bu GPR uygulamasinin kodu " + localDevice
+                    + ". GPR ekranindaki cihaz koduyla YENI lisans uretin.";
         try {
             byte[] pubBytes = Base64.decode(PUBLIC_KEY_B64, Base64.DEFAULT);
             PublicKey pub = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(pubBytes));
             Signature sig = Signature.getInstance("SHA256withRSA");
             sig.initVerify(pub);
             sig.update(payload(c).getBytes(StandardCharsets.UTF_8));
-            byte[] signature = Base64.decode(p[2], Base64.URL_SAFE | Base64.NO_WRAP | Base64.NO_PADDING);
-            return sig.verify(signature);
-        } catch (Exception e) {
-            return false;
+            byte[] signature = Base64.decode(parts[2], Base64.URL_SAFE | Base64.NO_WRAP | Base64.NO_PADDING);
+            if (sig.verify(signature)) return null;
+            return "Dijital imza dogrulanamadi. Kod eksik kopyalanmis ya da baska bir yonetici surumuyle uretilmis olabilir.";
+        } catch (Exception ex) {
+            return "Dijital imza okunamadi. Kodu yeniden kopyalayip yapistirin.";
         }
+    }
+
+    private static String cleanToken(String raw) {
+        // WhatsApp / metin paylasimindan gelen bosluk ve satir sonlarini kaldir.
+        // Imza icindeki ASCII '-' karakterlerine asla dokunma.
+        String value = raw.trim().replace('\u2011','-').replace('\u2010','-')
+                .replace('\u2013','-').replace('\u2014','-');
+        return value.replaceAll("\\s+", "").replace("\u00A0", "")
+                .replace("\u200B", "").replace("\uFEFF", "");
+    }
+
+    public static boolean verify(Context c, String token) {
+        return validationError(c, token) == null;
     }
 
     public static boolean isActivated(Context c) {
@@ -73,7 +92,7 @@ public final class LicenseManager {
 
     public static boolean activate(Context c, String token) {
         if (!verify(c, token)) return false;
-        c.getSharedPreferences(PREF, Context.MODE_PRIVATE).edit().putString(KEY_TOKEN, token.trim()).apply();
+        c.getSharedPreferences(PREF, Context.MODE_PRIVATE).edit().putString(KEY_TOKEN, cleanToken(token)).apply();
         return true;
     }
 

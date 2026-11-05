@@ -91,7 +91,30 @@ public final class ActivationActivity extends Activity {
         });
         form.addView(copy, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, Ui.dp(this, 48)));
 
-        TextView actLabel = Ui.text(this, "GPR AKTİVASYON KODU", 12, Color.rgb(150, 180, 198));
+        TextView paste = Ui.text(this, "AKTİVASYON KODUNU PANODAN YAPIŞTIR", 13, Color.rgb(3, 20, 18));
+        paste.setGravity(Gravity.CENTER);
+        paste.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        paste.setBackground(Ui.bg(Color.rgb(245, 193, 74), 13, this));
+        LinearLayout.LayoutParams pasteLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, Ui.dp(this, 46));
+        pasteLp.setMargins(0, Ui.dp(this, 10), 0, 0);
+        form.addView(paste, pasteLp);
+        paste.setOnClickListener(v -> {
+            ClipboardManager cm = (ClipboardManager)getSystemService(Context.CLIPBOARD_SERVICE);
+            if (cm != null && cm.hasPrimaryClip() && cm.getPrimaryClip() != null
+                    && cm.getPrimaryClip().getItemCount() > 0) {
+                CharSequence content = cm.getPrimaryClip().getItemAt(0).coerceToText(this);
+                if (content != null) {
+                    codeInput.setText(content.toString());
+                    codeInput.setSelection(codeInput.length());
+                    Toast.makeText(this, "Kod panodan alındı", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+            }
+            Toast.makeText(this, "Panoda kod bulunamadı", Toast.LENGTH_SHORT).show();
+        });
+
+        TextView actLabel = Ui.text(this, "AKTİVASYON KODU (KTD1)", 12, Color.rgb(150, 180, 198));
         actLabel.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         LinearLayout.LayoutParams alp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, Ui.dp(this, 34));
         alp.setMargins(0, Ui.dp(this, 16), 0, 0);
@@ -100,7 +123,7 @@ public final class ActivationActivity extends Activity {
         codeInput = new EditText(this);
         codeInput.setTextColor(Color.WHITE);
         codeInput.setHintTextColor(Color.rgb(100, 128, 145));
-        codeInput.setHint("Yönetici tarafından verilen KTDG1 kodunu girin");
+        codeInput.setHint("Mevcut KTD Aktivasyon Yöneticisinden üretilen KTD1 kodunu girin");
         codeInput.setTextSize(13);
         codeInput.setSingleLine(false);
         codeInput.setMinLines(3);
@@ -143,7 +166,12 @@ public final class ActivationActivity extends Activity {
             finish();
         } else {
             status.setTextColor(Color.rgb(255, 90, 90));
-            status.setText("AKTİVASYON KODU GEÇERSİZ VEYA BU CİHAZA AİT DEĞİL");
+            String error = LicenseManager.validationError(this, token);
+            status.setText(error == null ? "Aktivasyon kaydedilemedi" : error);
+            new android.app.AlertDialog.Builder(this)
+                    .setTitle("Aktivasyon neden kabul edilmedi?")
+                    .setMessage(error == null ? "Kod doğrulandı, ancak aktivasyon kaydedilemedi." : error)
+                    .setPositiveButton("TAMAM", null).show();
         }
     }
 }
