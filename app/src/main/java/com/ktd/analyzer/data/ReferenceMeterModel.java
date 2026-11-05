@@ -7,7 +7,7 @@ package com.ktd.analyzer.data;
  * R: baseline measured at the start of the SAME scan (not nominal 512).
  * delta=raw-R. Positive and negative headroom are normalized separately:
  * Zrelative = abs(delta) (minimum 15 ADC counts).
- * depthIndex = 800 / Zrelative.
+ * depthIndex = (800 / Zrelative) / 10.
  *
  * 15 raw counts is the GMR display threshold; below it there is no anomaly.
  * A null reading is NaN, NEVER a fabricated 0 m depth.
@@ -15,7 +15,7 @@ package com.ktd.analyzer.data;
 public final class ReferenceMeterModel {
     private ReferenceMeterModel(){}
     // An experimental dimensionless inverse-signal index, NEVER physical metres.
-    public static final float NUMERATOR=800f;
+    public static final float NUMERATOR=80f; // (800 / |olcum - referans|) / 10
     public static final float ADC_RANGE=1023f;
     public static final float ANOMALY_THRESHOLD=15f;
     public static float normalizedSignal(float raw,float reference){

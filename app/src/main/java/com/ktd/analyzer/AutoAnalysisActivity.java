@@ -10,7 +10,7 @@ import com.ktd.analyzer.data.ScanData;
 import com.ktd.analyzer.data.ScanSessionStore;
 import java.util.Locale;
 
-/** Tarama sinyalinden deneysel anomali puanları ve 800/Z proje derinlikleri. */
+/** Tarama sinyalinden deneysel anomali puanları ve (800/Z)/10 proje gosterimi. */
 public final class AutoAnalysisActivity extends Activity {
  private void line(LinearLayout host,String text,int size){
   TextView t=Ui.text(this,text,size,Color.rgb(224,236,242));

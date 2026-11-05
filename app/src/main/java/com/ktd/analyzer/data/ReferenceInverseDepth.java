@@ -6,7 +6,7 @@ import java.util.Collections;
 /**
  * Ortam referansina gore iki yonlu normalize edilen proje derinlik indeksi.
  * R = taramanin ilk referansi, delta = hamZ-R.
- * Z_ref=|delta|, proje indeksi=800/Z_ref (|delta| >= 15).
+ * Z_ref=|delta|, goruntuleme olcegi=(800/Z_ref)/10 (|delta| >= 15).
  * Bu fiziksel derinlik degildir. CSV ham Z/C kayitlari degistirilmez.
  */
 public final class ReferenceInverseDepth {
@@ -88,7 +88,7 @@ public final class ReferenceInverseDepth {
     }
 
     /**
-     * Voxler-like C axis: C = 800 / Z is used in its ORIGINAL numeric
+     * Voxler-like display axis: (800 / Z) / 10 is used in its numeric
      * coordinate, without per-scan min/max normalization. Thus two scans
      * with identical Z values produce identical C positions.
      * C is a derived magnetic SIGNAL INDEX, NOT a measured depth in metres.
@@ -96,7 +96,7 @@ public final class ReferenceInverseDepth {
     public static ScanData createRelativeIndexVolume(ScanData original){
         if(original==null)return null;
         ScanData out=createVisualDepth(original);
-        // Referans farkinin tersine dayanan ayni C=800/|Z-R| konumu.
+        // Referans farkinin tersine dayanan ortak (800/|Z-R|)/10 konumu.
         // 2D, 3D, 4D ve analiz ayni referans temelli formulu kullanir.
         for(int r=0;r<out.rows;r++)for(int c=0;c<out.cols;c++){
             float estimate=ReferenceMeterModel.meters(out.raw[r][c],out.reference);

@@ -228,12 +228,12 @@ public final class MagneticRadarActivity extends Activity implements BluetoothCl
         });
     }
     // GMR anomaly stream: one received magnetic measurement per horizontal column.
-    // The vertical position is the project's 800/Z visualization convention,
+    // The vertical position is the project's (800/Z)/10 visualization convention,
     // NOT independently measured GPR propagation depth or a material ID.
     // No simulated hyperbolas or added target geometries.
     // GMR pseudo-radargram: each column is generated from ONE measured magnetic
     // gradiometer sample. The wavelet is a visual encoding, not a measured GPR echo.
-    // 800/Z is kept as the project's display axis. It is not time-of-flight depth.
+    // (800/Z)/10 is kept as the project's display axis. It is not time-of-flight depth.
     private void appendDelta(float delta, boolean store){
         long processToken=perfMonitor.processBegin();
         if(store){synchronized(captured){captured.add(delta);}}
