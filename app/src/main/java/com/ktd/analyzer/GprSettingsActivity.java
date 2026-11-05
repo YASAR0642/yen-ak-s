@@ -27,7 +27,7 @@ public final class GprSettingsActivity extends Activity {
         Button smart=Ui.button(this,"AKILLI ANOMALİ RENKLERİ",true);
         smart.setOnClickListener(v->SmartColorDialog.show(this,()->ColorMaps.configure(this)));
         body.addView(smart,new LinearLayout.LayoutParams(-1,dp(56)));
-        TextView note=Ui.text(this,"Kayıtlı paletlerini GPR ekranındaki RENK menüsünden seçebilirsin. Renk ve anomali eşikleri görsel yorumdur; ölçüm verisini değiştirmez.",14,Color.rgb(181,207,220));
+        TextView note=Ui.text(this,"Kayıtlı paletlerini GPR ekranındaki RENK düğmesine basarak sırayla seçebilirsin. Renk ve anomali eşikleri görsel yorumdur; ölçüm verisini değiştirmez.",14,Color.rgb(181,207,220));
         body.addView(note,new LinearLayout.LayoutParams(-1,dp(95)));
         Switch voice=new Switch(this);voice.setText("TÜRKÇE SESLİ YÖNLENDİRME");voice.setTextColor(Color.WHITE);
         voice.setChecked(getSharedPreferences("gpr_options",0).getBoolean("voice",true));

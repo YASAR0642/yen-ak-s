@@ -229,27 +229,23 @@ public final class GprRadargramView extends View {
                 && cursorY>=top && cursorY<=top+hh){
             int selected=Math.min(visibleN-1,Math.max(0,
                 (int)(((cursorX-left)/(float)Math.max(1,ww))*currentWindow)));
-            long displayedIndex=firstVisibleTrace+selected;
-            double xMetres=hasDistanceCalibration()?displayedIndex*dxMeters*traceStride:Double.NaN;
+            // Tek bir metre etiketi: dokunulan satirin tahmini derinligi.
+            // Gecerli zaman bilgisi yoksa gorunuse bakarak sayi uydurma.
             double yFraction=(cursorY-top)/(double)Math.max(1,hh);
-            String horizontal=Double.isFinite(xMetres)?
-                String.format(Locale.forLanguageTag("tr-TR"),"X %.2f m",xMetres):
-                "X "+(displayedIndex+1)+". iz (metre bilinmiyor)";
-            String vertical=measuredNs?
-                String.format(Locale.forLanguageTag("tr-TR"),"Tahmini Z %.2f m",yFraction*maxDepth):
-                "Z: ns / zemin kalibrasyonu yok";
+            String metre=measuredNs?
+                String.format(Locale.forLanguageTag("tr-TR"),"%.2f m",yFraction*maxDepth):
+                "Metre kalibrasyonu yok";
             p.setStyle(Paint.Style.STROKE);
             p.setStrokeWidth(Math.max(1f,dp));p.setColor(Color.rgb(255,240,105));
             canvas.drawLine(cursorX,top,cursorX,top+hh,p);
             canvas.drawLine(left,cursorY,left+ww,cursorY,p);
             p.setStyle(Paint.Style.FILL);p.setColor(Color.argb(218,4,18,29));
-            float labelW=Math.min(ww-4*dp,280*dp);
-            canvas.drawRect(left+3*dp,top+3*dp,left+3*dp+labelW,top+40*dp,p);
+            float labelW=Math.min(ww-4*dp,240*dp);
+            canvas.drawRect(left+3*dp,top+3*dp,left+3*dp+labelW,top+28*dp,p);
             label.setTextAlign(Paint.Align.LEFT);
-            label.setTextSize(11*getResources().getDisplayMetrics().scaledDensity);
+            label.setTextSize(12*getResources().getDisplayMetrics().scaledDensity);
             label.setColor(Color.WHITE);
-            canvas.drawText(horizontal,left+9*dp,top+18*dp,label);
-            canvas.drawText(vertical,left+9*dp,top+33*dp,label);
+            canvas.drawText(metre,left+9*dp,top+21*dp,label);
         }
     }
 }

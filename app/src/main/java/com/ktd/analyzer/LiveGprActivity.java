@@ -48,7 +48,7 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
     private final Object guard=new Object();
     private final ArrayDeque<GprProtocol.Message> queue=new ArrayDeque<>();
     private boolean flushScheduled=false, running=false, wasDemo=false, sound=true, hyperbola=true, auto=true;
-    private boolean wanted=false;
+    private boolean wanted=false, lastBtConnected=false;
     private BluetoothClient bluetooth;
     private GprRadargramView radar;
     private GprTracePanelsView panels;
@@ -81,7 +81,7 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
             final int column=(int)(((long)playedIndex*columns+total-1)/total);
             if(column<columns && (int)((long)column*total/columns)==playedIndex) radar.add(trace);
             count++;
-            if(sound)alertSignal(trace);
+            alertSignal(trace);
         }
         panels.invalidate();updateFooter();
         if(replayPosition>=loadedTraces.size()){
@@ -102,6 +102,8 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
         bluetooth=new BluetoothClient(this);
         try{tone=new ToneGenerator(AudioManager.STREAM_MUSIC,30);}catch(Exception ignored){}
         voiceGuide=new VoiceGuide(this);
+        sound=getSharedPreferences("gpr_options",0).getBoolean("voice",true);
+        voiceGuide.setEnabled(sound);
         com.ktd.analyzer.view.ColorMaps.configure(this);
         selectedPalette=Prefs.palette(this);
         build();
@@ -139,9 +141,9 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
         head.addView(back,new LinearLayout.LayoutParams(dp(92),dp(38)));
         TextView title=text("KTD GPR SYSTEM",20);title.setGravity(Gravity.CENTER_VERTICAL);title.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
         head.addView(title,new LinearLayout.LayoutParams(0,dp(40),1));
-        connection=text("COM",11);connection.setBackground(Ui.bg(NAVY,6,this));
+        connection=text("○ BLUETOOTH",11);connection.setBackground(Ui.bg(NAVY,6,this));
         connection.setOnClickListener(v->bluetooth.pickPaired(this));
-        head.addView(connection,new LinearLayout.LayoutParams(dp(110),dp(34)));
+        head.addView(connection,new LinearLayout.LayoutParams(dp(124),dp(34)));
         root.addView(head,new LinearLayout.LayoutParams(-1,dp(43)));
 
         LinearLayout body=new LinearLayout(this);body.setOrientation(LinearLayout.HORIZONTAL);
@@ -172,11 +174,15 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
 
         LinearLayout control=new LinearLayout(this);control.setPadding(dp(3),dp(3),dp(3),dp(3));
         control.setOrientation(LinearLayout.VERTICAL);
-        Button com=action("COM");
-        com.setOnClickListener(v->bluetooth.pickPaired(this));
+        Button createColor=action("RENK OLUŞTUR");
+        createColor.setOnClickListener(v->CustomPaletteEditor.show(this,()->{
+            com.ktd.analyzer.view.ColorMaps.configure(this);
+            selectedPalette=Prefs.palette(this);
+            radar.setPalette(selectedPalette);
+        }));
         Button open=action("DOSYA AÇ");
         open.setOnClickListener(v->openFile());
-        addRow(control,com,open);
+        addRow(control,createColor,open);
         Button save=action("KAYDET");
         save.setOnClickListener(v->save());
         startButton=action("BAŞLAT");
@@ -188,7 +194,14 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
         timeButton.setOnClickListener(v->chooseTime());
         addRow(control,stop,timeButton);
         Button colors=action("RENK");
-        colors.setOnClickListener(v->choosePalette());
+        colors.setOnClickListener(v->{
+            com.ktd.analyzer.view.ColorMaps.configure(this);
+            int n=Math.max(1,com.ktd.analyzer.view.ColorMaps.count());
+            selectedPalette=(selectedPalette+1)%n;
+            Prefs.setPalette(this,selectedPalette);
+            radar.setPalette(selectedPalette);
+            Toast.makeText(this,com.ktd.analyzer.view.ColorMaps.name(selectedPalette),Toast.LENGTH_SHORT).show();
+        });
         LinearLayout paletteRow=new LinearLayout(this);
         paletteRow.addView(colors,new LinearLayout.LayoutParams(-1,dp(36)));
         control.addView(paletteRow,new LinearLayout.LayoutParams(-1,dp(37)));
@@ -197,6 +210,14 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
         LinearLayout antennaRow=new LinearLayout(this);
         antennaRow.addView(antennaButton,new LinearLayout.LayoutParams(-1,dp(36)));
         control.addView(antennaRow,new LinearLayout.LayoutParams(-1,dp(37)));
+        soundButton=action(sound?"SES AÇIK":"SES KAPALI");
+        soundButton.setOnClickListener(v->{
+            sound=!sound;
+            getSharedPreferences("gpr_options",0).edit().putBoolean("voice",sound).apply();
+            if(voiceGuide!=null)voiceGuide.setEnabled(sound);
+            soundButton.setText(sound?"SES AÇIK":"SES KAPALI");
+        });
+        control.addView(soundButton,new LinearLayout.LayoutParams(-1,dp(37)));
         body.addView(control,weighted(17));
         root.addView(body,new LinearLayout.LayoutParams(-1,0,1));
         footer=text("COM • 0 İZ",10);footer.setGravity(Gravity.CENTER_VERTICAL);
@@ -214,14 +235,16 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
     private void refresh(){
         if(connection==null)return;
         boolean connected=BluetoothClient.isConnected();
-        connection.setText(connected?"● COM":"○ COM");
+        connection.setText(connected?"● BLUETOOTH":"○ BLUETOOTH");
         connection.setTextColor(connected?TEAL:Color.rgb(247,129,111));
+        if(connected&&!lastBtConnected)Toast.makeText(this,"Bluetooth bağlandı",Toast.LENGTH_SHORT).show();
+        lastBtConnected=connected;
         updateFooter();
     }
     private void updateFooter(){
         if(footer==null)return;
         String mode=fileMode?(playingFile?"DOSYA OYNATILIYOR":"DOSYA DURDU"):(radar.isDemo()?"DEMO":radar.hasTimeAxis()?"ns":"ÖRNEK");
-        footer.setText(String.format(Locale.forLanguageTag("tr-TR"),"%s  •  %d İZ  •  %s  •  εr=%.0f",fileMode?(replayPosition+"/"+loadedTraces.size()):BluetoothClient.isConnected()?"COM BAĞLI":"COM KAPALI",count,mode,eps)+"  •  ANTEN "+antennaMhz+" MHz");
+        footer.setText(String.format(Locale.forLanguageTag("tr-TR"),"%s  •  %d İZ  •  %s  •  εr=%.0f",fileMode?(replayPosition+"/"+loadedTraces.size()):BluetoothClient.isConnected()?"BLUETOOTH BAĞLI":"BLUETOOTH KAPALI",count,mode,eps)+"  •  ANTEN "+antennaMhz+" MHz");
     }
     private void stopPlayback(){playingFile=false;ui.removeCallbacks(replayTick);}
     private void refreshReplayButtons(){
@@ -453,7 +476,7 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
             if(m.meta!=null){lastDeviceNs=m.meta.nsPerSample;radar.setMeta(m.meta);
                 if(Double.isFinite(timeOverrideNs))radar.setImportedMeta(timeOverrideNs,m.meta.dxMeters,m.meta.isDemo());
                 wasDemo=m.meta.isDemo();}
-            if(m.trace!=null){radar.add(m.trace);count++;if(sound)alertSignal(m.trace);}
+            if(m.trace!=null){radar.add(m.trace);count++;alertSignal(m.trace);}
         }
         panels.invalidate();updateFooter();
     }};
@@ -464,10 +487,10 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
         // Only real traces or genuine file records, never device demo modes.
         if(!fileMode && (wasDemo||radar.isDemo()))return;
         long now=SystemClock.elapsedRealtime();
-        if(now-lastAudio<1200)return;
+        if(now-lastAudio<4000)return;
         lastAudio=now;
-        if(voiceGuide!=null && getSharedPreferences("gpr_options",0).getBoolean("voice",true))
-            voiceGuide.say("Olası boşluk anomalisi");
+        if(!sound)return;
+        if(voiceGuide!=null)voiceGuide.say("Olası boşluk anomalisi");
         if(tone!=null)try{tone.startTone(ToneGenerator.TONE_PROP_BEEP,95);}catch(Exception ignored){}
     }
 

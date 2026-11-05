@@ -1,0 +1,19 @@
+KTD GPR SYSTEM v1.0.4 - 5 Kasim 2026
+
+Son v1.0.3 kaynak uzerine:
+- Ust COM durum etiketi BLUETOOTH oldu; bagli yesil, bagli degil kirmizi.
+- Bluetooth durumuna tiklandiginda mevcut eslesmis cihaz secimi acilir.
+- Bluetooth baglaninca 'Bluetooth baglandi' bildirimi bir kez gosterilir.
+- Sag COM dugmesi RENK OLUSTUR olarak degistirildi.
+- 10 RGB renk duragi ve isimli palet kaydetme/silme mevcut CustomPaletteEditor/Store ile acilir.
+- RENK dugmesi secim listesi acmadan bir sonraki palete gecer. Kisa toast palet adini gosterir.
+- SES ACIK/KAPALI butonu eklendi; tercih kalici, kapatinca konusma aninda durur.
+- Hiperbol ses kurali daha secici: belirgin iki kol, merkez ve ara omuz sinyali; tekrar kilidi.
+- GPR imleci X/Z yerine sadece mevcut kalibrasyonla tahmini dussey metreyi gosterir.
+- Zaman kalibrasyonu olmayan dosyada sayi uydurulmaz: 'Metre kalibrasyonu yok'.
+- Radargram geometrisi, G1-G4 panelleri, Bluetooth GPR verisini okuma, dosya oynatma korunur.
+
+ONEMLI: Algilanan hiperbol bosluk teshisi DEGILDIR. Esikler prototiptir.
+GPR iz araligi (dx) olmayan veride gercek yatay ilerleme metresi de hesaplanamaz.
+Android SDK olmadigi icin APK derlemesi yapilmadi. Java detectoru bagimsiz derlendi;
+400 sahte yatay katman/parazit izinde 0, 1 sentetik hiperbolde 1 uyarı goruldu.
