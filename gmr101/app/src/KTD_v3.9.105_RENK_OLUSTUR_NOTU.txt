@@ -1,0 +1,6 @@
+v3.9.105 KULLANICI RENK PALETLERI
+Ayarlar > RENK OLUSTUR. Palete isim verin, negatif-pozitif 5 rengi RGB kaydiricilarindan secin ve KAYDET.
+Paletler cihazin uygulama tercihlerine kaydedilir. En cok 12 ozel palet.
+2D / 3D / 4D / GMR normal cekim palet seceneklerinde adlari gorunur. GMR radargram RENK butonunda ozel paletler listelenir.
+Akilli anomali renklendirme etkin oldugundan guclu isaretli anomaliler secili paletin renkleri uzerine vurgu alabilir.
+Renkler malzeme teshisi degildir. Derinlik ve sensor olcumleri degistirilmemistir.

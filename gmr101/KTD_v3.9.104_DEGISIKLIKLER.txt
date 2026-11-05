@@ -1,0 +1,1 @@
+KTD v3.9.104: AKILLI RENK dugmesi 2D ekraninda Izgara/Yeni Tarama/3D-4D yanina, 3D ve 4D ekraninda 3D/4D/Gorunum yanina tasindi. Tum bu ekranlarda ust kontrol cubugunda gorunur. Olcum ve derinlik algoritmalari degistirilmedi.

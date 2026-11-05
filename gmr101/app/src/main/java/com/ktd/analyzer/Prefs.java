@@ -53,8 +53,9 @@ public final class Prefs {
         .putFloat("vol_threshold",Math.max(.03f,Math.min(.92f,threshold))).apply();}
     public static String prefix(Context c){ return p(c).getString("prefix", "KTD_SCAN"); }
     public static int palette(Context c){
+        com.ktd.analyzer.view.ColorMaps.configure(c);
         int v=p(c).getInt("palette",0);
-        return (v>=0 && v<com.ktd.analyzer.view.ColorMaps.COUNT)?v:13;
+        return (v>=0 && v<com.ktd.analyzer.view.ColorMaps.count())?v:0;
     }
 
     /** Kullanıcı yalnız X/Y/adım/yön seçer; alan boyutu uygulama içinde otomatik hesaplanır. */
@@ -73,6 +74,6 @@ public final class Prefs {
     }
     public static void setVoiceGuide(Context c,boolean on){p(c).edit().putBoolean("voice_guide",on).apply();}
     public static void setPrefix(Context c,String s){ p(c).edit().putString("prefix", s==null||s.trim().isEmpty()?"KTD_SCAN":s.trim()).apply(); }
-    public static void setPalette(Context c,int v){ p(c).edit().putInt("palette",Math.max(0,Math.min(com.ktd.analyzer.view.ColorMaps.COUNT-1,v))).apply(); }
+    public static void setPalette(Context c,int v){ p(c).edit().putInt("palette",Math.max(0,Math.min(com.ktd.analyzer.view.ColorMaps.count()-1,v))).apply(); }
     private static int clamp(int v,int a,int b){ return Math.max(a,Math.min(b,v)); }
 }

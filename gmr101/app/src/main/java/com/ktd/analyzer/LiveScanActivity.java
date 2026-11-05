@@ -187,7 +187,7 @@ public final class LiveScanActivity extends Activity implements BluetoothClient.
 
         HorizontalScrollView ps = new HorizontalScrollView(this); ps.setHorizontalScrollBarEnabled(false);
         PaletteStripView palettes = new PaletteStripView(this); palettes.setListener(p->{Prefs.setPalette(this,p);ultrasound.setPalette(p);});
-        ps.addView(palettes,new HorizontalScrollView.LayoutParams(Ui.dp(this, ColorMaps.COUNT*92),Ui.dp(this,52)));
+        ps.addView(palettes,new HorizontalScrollView.LayoutParams(Ui.dp(this, PaletteStripView.entryCount()*112),Ui.dp(this,52)));
         LinearLayout smartRow=new LinearLayout(this);smartRow.setGravity(Gravity.CENTER_VERTICAL);
         Button smartColors=Ui.button(this,"AKILLI\nRENK",false);Ui.fitText(smartColors,9,12,2);
         smartColors.setOnClickListener(v->SmartColorDialog.show(this,()->{ultrasound.setPalette(Prefs.palette(this));palettes.invalidate();}));

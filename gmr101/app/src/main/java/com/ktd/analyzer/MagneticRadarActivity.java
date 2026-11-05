@@ -181,7 +181,18 @@ public final class MagneticRadarActivity extends Activity implements BluetoothCl
         add(controls,startButton);
         Button open=button("DOSYA AÇ");open.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xff265d86));open.setOnClickListener(v->open());add(controls,open);
         Button save=button("KAYDET");save.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xff247c67));save.setOnClickListener(v->save());add(controls,save);
-        Button color=button("RENK");colorButton=color;color.setOnClickListener(v->{palette=(palette+1)%GMR_CLASSIC_PALETTE_COUNT;radar.setPalette(palette);color.setText("RENK\n"+(palette+1)+"/"+GMR_CLASSIC_PALETTE_COUNT);panels.invalidate();updateButtonColors();});add(controls,color);
+        Button color=button("RENK");colorButton=color;color.setOnClickListener(v->{
+            com.ktd.analyzer.view.ColorMaps.configure(this);
+            java.util.ArrayList<com.ktd.analyzer.CustomPaletteStore.Item> saved=com.ktd.analyzer.CustomPaletteStore.load(this);
+            String[] names=new String[GMR_CLASSIC_PALETTE_COUNT+saved.size()];
+            for(int i=0;i<GMR_CLASSIC_PALETTE_COUNT;i++)names[i]="GMR Klasik "+(i+1);
+            for(int i=0;i<saved.size();i++)names[GMR_CLASSIC_PALETTE_COUNT+i]=saved.get(i).name;
+            new android.app.AlertDialog.Builder(this).setTitle("GMR RENK PALETİ")
+                .setItems(names,(d,which)->{
+                    palette=which<GMR_CLASSIC_PALETTE_COUNT?which:com.ktd.analyzer.CustomPaletteStore.BASE+which-GMR_CLASSIC_PALETTE_COUNT;
+                    radar.setPalette(palette);color.setText(which<GMR_CLASSIC_PALETTE_COUNT?"RENK\n"+(which+1):"ÖZEL\nRENK");panels.invalidate();updateButtonColors();
+                }).setNegativeButton("İPTAL",null).show();
+        });add(controls,color);
         Button filter=button("MİNERAL\nKAPALI");mineralButton=filter;filter.setOnClickListener(v->{mineral=!mineral;filter.setText(mineral?"MİNERAL\nAÇIK":"MİNERAL\nKAPALI");updateButtonColors();});add(controls,filter);
         Button reset=button("SIFIRLA");reset.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xff965344));reset.setOnClickListener(v->{setFileTitle("CANLI ÇEKİM");fileMode=false;playingFile=false;previewShowing=false;lastArrivalMs=0;averageArrivalNs=0;timingSamples=0;radar.setWindowTraces(72);playbackHandler.removeCallbacks(playTick);showStartButton(false);playback.clear();playPos=0;reference.clear();zeroed=false;sequence=0;resetDetection();radar.clear();radar.setSurveyPositionCm(0);radar.setBrowseEnabled(true);panels.invalidate();synchronized(captured){captured.clear();}});add(controls,reset);
         body.addView(controls,new LinearLayout.LayoutParams(0,-1,16));

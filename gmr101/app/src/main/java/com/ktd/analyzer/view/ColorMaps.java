@@ -16,9 +16,13 @@ public final class ColorMaps {
         "Bakır", "Viridis", "Boşluk İçi Metal", "KTD VOLENDER", "ODA", "Malzeme", "Visualizer Klasik", "GER / KTD Anomali", "KTD 6 Renk Deney", "Küp / Turuncu", "Boşluk / Mavi", "Dolgu / Buz Mavisi", "Demir / Siyah", "Metal / Kırmızı", "KTD Polarite (+/-)"
     };
     private ColorMaps(){}
+    private static volatile java.util.ArrayList<com.ktd.analyzer.CustomPaletteStore.Item> custom=new java.util.ArrayList<>();
+    public static int count(){return COUNT+custom.size();}
+    public static String name(int index){return index<COUNT?NAMES[Math.max(0,Math.min(COUNT-1,index))]:index-COUNT<custom.size()?custom.get(index-COUNT).name:"Özel";}
     private static volatile int sensitivity=1, transition=1;
     private static volatile float blueThreshold=.20f, mineralThreshold=.28f, redThreshold=.48f;
     public static void configure(Context context){
+        custom=com.ktd.analyzer.CustomPaletteStore.load(context);
         sensitivity=Prefs.smartSensitivity(context);
         transition=Prefs.smartTransition(context);
         blueThreshold=Prefs.smartBlueThreshold(context)/100f;
@@ -71,6 +75,15 @@ public final class ColorMaps {
     }
 
     private static int baseColor(int palette,float value,float maxAbs){
+        if(palette>=COUNT){
+            int index=palette-COUNT;
+            if(index>=0 && index<custom.size()){
+                int[] stops=custom.get(index).colors;
+                float u=Math.max(0f,Math.min(1f,(value/Math.max(1f,maxAbs)+1f)*.5f))*(stops.length-1);
+                int section=Math.min(stops.length-2,(int)u);
+                return lerp(stops[section],stops[section+1],u-section);
+            }
+        }
         if(maxAbs<1f)maxAbs=1f;
         float t=Math.max(-1f,Math.min(1f,value/maxAbs));
         float u=(t+1f)*.5f;

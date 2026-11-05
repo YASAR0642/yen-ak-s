@@ -1,0 +1,1 @@
+Renk Olustur: 10 ayri RGB rengi, adlandirma ve kaydetme. Eski 5 renkli kayitlar otomatik 10 renge tamamlanir. Tum mevcut secim alanlari korunur.

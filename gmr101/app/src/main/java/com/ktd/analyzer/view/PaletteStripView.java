@@ -1,12 +1,34 @@
 package com.ktd.analyzer.view;
 
-import android.content.Context;import android.graphics.*;import android.view.*;import com.ktd.analyzer.Prefs;import com.ktd.analyzer.Ui;
+import android.content.Context;
+import android.graphics.*;
+import android.view.*;
+import com.ktd.analyzer.Prefs;
+import com.ktd.analyzer.Ui;
 
-public final class PaletteStripView extends View{
-    public interface Listener{void onPalette(int p);}private final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);private int selected;private Listener listener;
-    private static final int[] VISIBLE={0,1,7,11,12,13};
-    public PaletteStripView(Context c){super(c);selected=Prefs.palette(c);setBackgroundColor(Color.rgb(7,16,24));setMinimumWidth(Ui.dp(c,VISIBLE.length*92));}
-    public void setListener(Listener l){listener=l;}public int selected(){return selected;}
-    protected void onDraw(Canvas c){super.onDraw(c);float gap=8f;float getW=(getWidth()-gap*(VISIBLE.length+1))/VISIBLE.length;float top=7,bottom=getHeight()-7;for(int k=0;k<VISIBLE.length;k++){float l=gap+(getW+gap)*k;for(int i=0;i<72;i++){float t=i/71f;int col=ColorMaps.color(VISIBLE[k],(t*2f-1f)*100,100);p.setColor(col);float x1=l+getW*i/72f,x2=l+getW*(i+1)/72f+1;c.drawRect(x1,top,x2,bottom,p);}p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(VISIBLE[k]==selected?4:1);p.setColor(VISIBLE[k]==selected?Color.WHITE:Color.argb(130,255,255,255));c.drawRoundRect(l,top,l+getW,bottom,7,7,p);p.setStyle(Paint.Style.FILL);}}
-    public boolean onTouchEvent(MotionEvent e){if(e.getAction()!=MotionEvent.ACTION_DOWN)return true;float gap=8f,getW=(getWidth()-gap*(VISIBLE.length+1))/VISIBLE.length;for(int k=0;k<VISIBLE.length;k++){float l=gap+(getW+gap)*k;if(e.getX()>=l&&e.getX()<=l+getW){selected=VISIBLE[k];Prefs.setPalette(getContext(),selected);invalidate();if(listener!=null)listener.onPalette(selected);break;}}return true;}
+public final class PaletteStripView extends View {
+    public interface Listener {void onPalette(int palette);}
+    private static final int[] PRESET={0,1,7,11,12,13};
+    private final Paint pen=new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final int slot;
+    private int selected;
+    private Listener listener;
+    public PaletteStripView(Context context){super(context);ColorMaps.configure(context);selected=Prefs.palette(context);slot=Ui.dp(context,112);setBackgroundColor(Color.rgb(7,16,24));setMinimumWidth(slot*entryCount());}
+    public static int entryCount(){return PRESET.length+Math.max(0,ColorMaps.count()-ColorMaps.COUNT);}
+    public void setListener(Listener l){listener=l;}
+    public int selected(){return selected;}
+    private static int indexAt(int i){return i<PRESET.length?PRESET[i]:ColorMaps.COUNT+i-PRESET.length;}
+    @Override protected void onDraw(Canvas c){super.onDraw(c);int count=entryCount();float density=getResources().getDisplayMetrics().density;
+        pen.setTextSize(10*density);pen.setTypeface(Typeface.DEFAULT_BOLD);pen.setTextAlign(Paint.Align.CENTER);
+        for(int k=0;k<count;k++){
+            int id=indexAt(k);float left=k*slot+4*density,right=(k+1)*slot-4*density;
+            float top=3*density,bottom=getHeight()-17*density;
+            for(int i=0;i<44;i++){float t=i/43f;pen.setStyle(Paint.Style.FILL);pen.setColor(ColorMaps.color(id,(t*2-1)*100f,100));float x1=left+(right-left)*i/44f,x2=left+(right-left)*(i+1)/44f+1;c.drawRect(x1,top,x2,bottom,pen);}
+            pen.setStyle(Paint.Style.STROKE);pen.setStrokeWidth((id==selected?3:1)*density);pen.setColor(id==selected?Color.WHITE:Color.GRAY);c.drawRect(left,top,right,bottom,pen);
+            pen.setStyle(Paint.Style.FILL);pen.setColor(Color.WHITE);
+            String label=ColorMaps.name(id);if(label.length()>15)label=label.substring(0,14)+"…";
+            c.drawText(label,(left+right)/2,getHeight()-3*density,pen);
+        }
+    }
+    @Override public boolean onTouchEvent(MotionEvent e){if(e.getAction()==MotionEvent.ACTION_DOWN){int index=(int)(e.getX()/slot);if(index>=0&&index<entryCount()){selected=indexAt(index);Prefs.setPalette(getContext(),selected);invalidate();if(listener!=null)listener.onPalette(selected);}return true;}return true;}
 }

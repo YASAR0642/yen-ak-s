@@ -62,7 +62,7 @@ public final class MagneticRadargramView extends View {
     public double getEpsilon(){return epsilonR;}
     public void setFilterMode(int f){filterMode=Math.max(0,Math.min(3,f));invalidate();}
     public int getFilterMode(){return filterMode;}
-    public void setPalette(int v){palette=Math.max(0,Math.min(4,v));invalidate();}
+    public void setPalette(int v){palette=Math.max(0,Math.min(ColorMaps.count()-1,v));invalidate();}
     public int getPalette(){return palette;}
     public void setHyperbolaEnhance(boolean v){hyperbolicContrast=v;invalidate();}
     public void setAutoContrast(boolean v){autoContrast=v;invalidate();}
@@ -123,6 +123,7 @@ public final class MagneticRadargramView extends View {
             Math.round(Color.blue(a)*(1-t)+Color.blue(b)*t));
     }
     private int shade(double signed){
+        if(palette>=ColorMaps.COUNT)return ColorMaps.color(palette,(float)(signed*100f),100f);
         if(Math.abs(signed)<0.001)return GMR_GRAY;
         // GMR radargramin normalize edilmis gorsel sinyaline de ortak tercihler uygulanir.
         int controlled=ColorMaps.color(1,(float)(signed*100f),100f);
