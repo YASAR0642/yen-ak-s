@@ -91,7 +91,7 @@ public final class ActivationActivity extends Activity {
         });
         form.addView(copy, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, Ui.dp(this, 48)));
 
-        TextView actLabel = Ui.text(this, "AKTİVASYON KODU (KTD1)", 12, Color.rgb(150, 180, 198));
+        TextView actLabel = Ui.text(this, "GPR AKTİVASYON KODU", 12, Color.rgb(150, 180, 198));
         actLabel.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         LinearLayout.LayoutParams alp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, Ui.dp(this, 34));
         alp.setMargins(0, Ui.dp(this, 16), 0, 0);
@@ -100,7 +100,7 @@ public final class ActivationActivity extends Activity {
         codeInput = new EditText(this);
         codeInput.setTextColor(Color.WHITE);
         codeInput.setHintTextColor(Color.rgb(100, 128, 145));
-        codeInput.setHint("Mevcut KTD Aktivasyon Yöneticisinden üretilen KTD1 kodunu girin");
+        codeInput.setHint("Yönetici tarafından verilen KTDG1 kodunu girin");
         codeInput.setTextSize(13);
         codeInput.setSingleLine(false);
         codeInput.setMinLines(3);

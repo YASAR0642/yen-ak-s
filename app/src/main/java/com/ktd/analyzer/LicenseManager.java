@@ -18,7 +18,7 @@ public final class LicenseManager {
 
     private static final String PREF = "ktd_gpr_license";
     private static final String KEY_TOKEN = "activation_token";
-    private static final String PREFIX = "KTD1";
+    private static final String PREFIX = "KTDG1";
     private static final String PUBLIC_KEY_B64 =
             "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAr6q8UzcE9Wwj+g+zuNF7pYN4BSVJleOA8NTHjYviAjJvMNUZ/GzU1mIfBOY9GWXTrpaUfPcFyhTKiwYgRR04RlM/RAkqnS56Uz9h7u3Nu6gTC1AC+vurCSV8OqQsN5TjLKidsJoL809/4iQBADWcF7pNtWWBssn8uN2oBo2sK6zRsyIC43lYGzNf3b77bCJjm6ADkM/BL1N5lx7CfGhSQQ/xkUzMZo1uxIZ6Lya1w6+Dqrv9iQNio4LkLMEcwIOhmOS2jgJRX3ocnisPu+MAEtHFUP6N+HnQ7brhLaKFOGncfckZ4SO00tMZiLzprxmawCyyxogMyYD2/wCzBjgpewIDAQAB";
 
@@ -37,13 +37,12 @@ public final class LicenseManager {
     }
 
     private static String payload(Context c) {
-        return "KTD|" + deviceCode(c) + "|LIFETIME";
+        return "KTDGPR|" + deviceCode(c) + "|LIFETIME";
     }
 
     public static boolean verify(Context c, String token) {
         if (token == null) return false;
-        // Only RSA licenses from the existing KTD activation manager are accepted.
-        // Device code includes KTDGPR and the distinct package name so KTD 3D licenses cannot match.
+        // GPR accepts only GPR-scoped RSA tokens: no shared HMAC keys in the APK.
         return verifyLegacy(c, token);
     }
 

@@ -1,0 +1,12 @@
+KTD GPR SYSTEM v1.0.9 - GPR aktivasyon entegrasyonu
+
+- Paket kimligi: com.ktd.gprsystem. KTD 3D ANALYZER uygulamasindan farklidir.
+- KTDG1-* lisans tipi, yalniz KTD GPR SYSTEM icin SHA256withRSA imzasi.
+- KTD1-* KTD 3D tokenleri GPR uygulamasini acmaz.
+- Launcher ve disaridan SGY dosyasi acilmasi lisans kontrolludur.
+- Ozel RSA anahtari GPR kaynak koduna konulmamistir.
+- Canli GPR izleme, radargram, hiperbol ve ses isleyisleri degistirilmedi.
+- Yonetici uygulamasi GPR ve 3D icin ayri kod uretir.
+
+YONETICI kaynak kodunda gizli RSA anahtari bulunmaktadir: YALNIZ PRIVATE REPO!
+GPR uygulamasinin tum kaynaklarini ayri bir repo icine yukleyin.
