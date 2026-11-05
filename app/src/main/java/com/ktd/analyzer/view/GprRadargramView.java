@@ -50,7 +50,7 @@ public final class GprRadargramView extends View {
     public double getEpsilon(){return epsilonR;}
     public void setFilterMode(int f){filterMode=Math.max(0,Math.min(3,f));invalidate();}
     public int getFilterMode(){return filterMode;}
-    public void setPalette(int v){palette=Math.max(0,Math.min(2,v));invalidate();}
+    public void setPalette(int v){palette=Math.max(0,Math.min(com.ktd.analyzer.view.ColorMaps.count()-1,v));invalidate();}
     public int getPalette(){return palette;}
     public void setHyperbolaEnhance(boolean v){hyperbolicContrast=v;invalidate();}
     public void setAutoContrast(boolean v){autoContrast=v;invalidate();}
@@ -76,17 +76,9 @@ public final class GprRadargramView extends View {
         traces.addLast(t);invalidate();
     }
     private int shade(double signed){
-        double v=Math.max(-1,Math.min(1,signed));
-        if(palette==PALETTE_GRAY){
-            int grey=Math.min(255,Math.max(0,(int)Math.round(128+125*v)));
-            return Color.rgb(grey,grey,grey);
-        }
-        if(palette==PALETTE_SEPIA){
-            int g=Math.min(255,Math.max(0,(int)Math.round(120+125*v)));
-            return Color.rgb(Math.min(255,(int)(g*1.10)),Math.min(255,(int)(g*.88)),(int)(g*.63));
-        }
-        if(v>0){double q=Math.pow(v,.83);return Color.rgb((int)(30+225*q),(int)(20+100*(1-q)),(int)(60*(1-q)));}
-        double q=Math.pow(-v,.83);return Color.rgb((int)(30*(1-q)),(int)(45+180*q),(int)(65+190*q));
+        // Bipolar echo-amplitude colour only: neither physical object nor depth identification.
+        float v=(float)Math.max(-1.0,Math.min(1.0,signed));
+        return ColorMaps.color(palette,v*100f,100f);
     }
     private float[][] processed(List<GprProtocol.Trace> items,int rowCount,int visibleSamples){
         int n=items.size();float[][] result=new float[n][rowCount];

@@ -5,11 +5,11 @@ android {
     compileSdk 35
 
     defaultConfig {
-        applicationId 'com.ktd.analyzer'
+        applicationId 'com.ktd.gprsystem'
         minSdk 23
         targetSdk 35
-        versionCode 39107
-        versionName '3.9.107-ozel-paleti-gorunur'
+        versionCode 1002
+        versionName '1.0.2-gpr-system'
     }
 
     buildTypes {

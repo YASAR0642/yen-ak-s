@@ -88,6 +88,7 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
     }};
     private double eps=9.0, timeOverrideNs=Double.NaN, lastDeviceNs=Double.NaN;
     private ToneGenerator tone;
+    private VoiceGuide voiceGuide;
     private final double[] timeOptions={Double.NaN,30,60,100,150,200,300,500};
     private final String[] filters={"FİLTRE YOK","DC DÜZELT","ZEMİN FİLTRE","KENAR VURGU"};
 
@@ -98,6 +99,9 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
         getWindow().setNavigationBarColor(Color.rgb(2,14,24));
         bluetooth=new BluetoothClient(this);
         try{tone=new ToneGenerator(AudioManager.STREAM_MUSIC,30);}catch(Exception ignored){}
+        voiceGuide=new VoiceGuide(this);
+        com.ktd.analyzer.view.ColorMaps.configure(this);
+        selectedPalette=Prefs.palette(this);
         build();
         if(getIntent()!=null && getIntent().getData()!=null)loadUri(getIntent().getData());
     }
@@ -111,7 +115,8 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
         ui.removeCallbacks(flush);ui.removeCallbacks(replayTick);playingFile=false;synchronized(guard){queue.clear();flushScheduled=false;}
         super.onStop();
     }
-    @Override protected void onDestroy(){if(tone!=null){tone.release();tone=null;}super.onDestroy();}
+    @Override protected void onResume(){super.onResume();com.ktd.analyzer.view.ColorMaps.configure(this);selectedPalette=Prefs.palette(this);if(radar!=null)radar.setPalette(selectedPalette);}
+    @Override protected void onDestroy(){if(tone!=null){tone.release();tone=null;}if(voiceGuide!=null)voiceGuide.shutdown();super.onDestroy();}
     private int dp(float v){return Ui.dp(this,v);}
     private TextView text(String value,int size){
         TextView tv=Ui.text(this,value,size,Color.WHITE);tv.setGravity(Gravity.CENTER);
@@ -128,9 +133,9 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
         LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(Color.rgb(5,15,23));root.setPadding(dp(4),dp(3),dp(4),dp(3));
         LinearLayout head=new LinearLayout(this);head.setGravity(Gravity.CENTER_VERTICAL);
-        Button back=action("‹");back.setOnClickListener(v->finish());
-        head.addView(back,new LinearLayout.LayoutParams(dp(42),dp(38)));
-        TextView title=text("KTD GPR ANALYZER",20);title.setGravity(Gravity.CENTER_VERTICAL);title.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
+        Button back=action("AYARLAR");back.setOnClickListener(v->startActivity(new Intent(this,GprSettingsActivity.class)));
+        head.addView(back,new LinearLayout.LayoutParams(dp(92),dp(38)));
+        TextView title=text("KTD GPR SYSTEM",20);title.setGravity(Gravity.CENTER_VERTICAL);title.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
         head.addView(title,new LinearLayout.LayoutParams(0,dp(40),1));
         connection=text("COM",11);connection.setBackground(Ui.bg(NAVY,6,this));
         connection.setOnClickListener(v->bluetooth.pickPaired(this));
@@ -139,7 +144,7 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
 
         LinearLayout body=new LinearLayout(this);body.setOrientation(LinearLayout.HORIZONTAL);
         radar=new GprRadargramView(this);
-        radar.setPalette(GprRadargramView.PALETTE_DIVERGING);
+        radar.setPalette(selectedPalette);
         radar.setHyperbolaEnhance(hyperbola);
         radar.setEpsilon(eps);
         body.addView(radar,weighted(66));
@@ -290,10 +295,12 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
         }
     }
     private void choosePalette(){
-        String[] choices={"Siyah - Beyaz", "Renkli (Kırmızı / Mavi)", "Sepya"};
+        com.ktd.analyzer.view.ColorMaps.configure(this);
+        int n=com.ktd.analyzer.view.ColorMaps.count();
+        String[] choices=new String[n];for(int i=0;i<n;i++)choices[i]=com.ktd.analyzer.view.ColorMaps.name(i);
         new AlertDialog.Builder(this).setTitle("RADARGRAM RENKLERİ")
-            .setSingleChoiceItems(choices,selectedPalette,(d,choice)->{
-                selectedPalette=choice;radar.setPalette(choice);d.dismiss();
+            .setSingleChoiceItems(choices,Math.max(0,Math.min(n-1,selectedPalette)),(d,choice)->{
+                selectedPalette=choice;Prefs.setPalette(this,choice);radar.setPalette(choice);d.dismiss();
             }).setNegativeButton("İPTAL",null).show();
     }
     private void showFullPreview(){
@@ -416,7 +423,8 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
         }
     }
     @Override public void onState(String s){runOnUiThread(()->{
-        refresh();if(!BluetoothClient.isConnected()){running=false;startButton.setText("BAŞLAT");}
+        boolean connected=BluetoothClient.isConnected();
+        refresh();if(!connected){running=false;startButton.setText("BAŞLAT");}
     });}
     @Override public void onFrame(SensorFrame f){/* Magnetometer is never converted to radar traces. */}
     @Override public void onGprLine(String line){
@@ -448,6 +456,7 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
         for(short v:t.samples){sum+=Math.abs((int)v);max=Math.max(max,Math.abs((int)v));}
         if(max>100&&max>3.8*(sum/(double)t.samples.length)){
             lastAudio=now;
+            if(voiceGuide!=null && getSharedPreferences("gpr_options",0).getBoolean("voice",true))voiceGuide.say("Güçlü yansıma anomalisi");
             try{tone.startTone(soundTone==0?ToneGenerator.TONE_PROP_BEEP:soundTone==1?ToneGenerator.TONE_PROP_ACK:ToneGenerator.TONE_PROP_NACK,100);}catch(Exception ignored){}
         }
     }
