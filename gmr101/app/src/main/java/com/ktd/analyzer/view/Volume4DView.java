@@ -37,7 +37,7 @@ public final class Volume4DView extends GLSurfaceView {
     private float lastX,lastY,lastMidX,lastMidY;
 
     public Volume4DView(Context c){
-        super(c);setEGLContextClientVersion(2);setEGLConfigChooser(8,8,8,8,16,0);
+        super(c);ColorMaps.configure(c);setEGLContextClientVersion(2);setEGLConfigChooser(8,8,8,8,16,0);
         renderer=new Renderer4D();setRenderer(renderer);setRenderMode(RENDERMODE_WHEN_DIRTY);
         scaler=new ScaleGestureDetector(c,new ScaleGestureDetector.SimpleOnScaleGestureListener(){@Override public boolean onScale(ScaleGestureDetector d){renderer.zoom=clamp(renderer.zoom*d.getScaleFactor(),.24f,6.0f);syncAxes();requestRender();return true;}});
     }

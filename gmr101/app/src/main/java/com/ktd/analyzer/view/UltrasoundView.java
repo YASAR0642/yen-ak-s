@@ -37,6 +37,7 @@ public final class UltrasoundView extends View {
 
     public UltrasoundView(Context c) {
         super(c);
+        ColorMaps.configure(c);
         setBackgroundColor(Color.rgb(3,9,14));
     }
 

@@ -45,6 +45,7 @@ public final class MagneticRadargramView extends View {
 
     public MagneticRadargramView(Context context){
         super(context);
+        ColorMaps.configure(context);
         label.setTypeface(android.graphics.Typeface.MONOSPACE);
         label.setTextSize(10*getResources().getDisplayMetrics().scaledDensity);
         label.setColor(Color.rgb(205,224,238));
@@ -123,6 +124,9 @@ public final class MagneticRadargramView extends View {
     }
     private int shade(double signed){
         if(Math.abs(signed)<0.001)return GMR_GRAY;
+        // GMR radargramin normalize edilmis gorsel sinyaline de ortak tercihler uygulanir.
+        int controlled=ColorMaps.color(1,(float)(signed*100f),100f);
+        if(Math.abs(signed)>0.12)return controlled;
         // Variations: classic, vivid, pastel, high contrast, deep.
         final int[] blue={0xff1749dc,0xff0044ff,0xff4675ed,0xff0023b9,0xff172b95};
         final int[] cyan={0xff37c9e9,0xff00e6ff,0xff88e6f5,0xff00c9fb,0xff1396cb};

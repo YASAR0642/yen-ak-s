@@ -188,7 +188,12 @@ public final class LiveScanActivity extends Activity implements BluetoothClient.
         HorizontalScrollView ps = new HorizontalScrollView(this); ps.setHorizontalScrollBarEnabled(false);
         PaletteStripView palettes = new PaletteStripView(this); palettes.setListener(p->{Prefs.setPalette(this,p);ultrasound.setPalette(p);});
         ps.addView(palettes,new HorizontalScrollView.LayoutParams(Ui.dp(this, ColorMaps.COUNT*92),Ui.dp(this,52)));
-        root.addView(ps,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,54)));
+        LinearLayout smartRow=new LinearLayout(this);smartRow.setGravity(Gravity.CENTER_VERTICAL);
+        Button smartColors=Ui.button(this,"AKILLI\nRENK",false);Ui.fitText(smartColors,9,12,2);
+        smartColors.setOnClickListener(v->SmartColorDialog.show(this,()->{ultrasound.setPalette(Prefs.palette(this));palettes.invalidate();}));
+        smartRow.addView(smartColors,new LinearLayout.LayoutParams(Ui.dp(this,99),Ui.dp(this,52)));
+        smartRow.addView(ps,new LinearLayout.LayoutParams(0,Ui.dp(this,54),1));
+        root.addView(smartRow,new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,Ui.dp(this,54)));
 
         LinearLayout gainRow=new LinearLayout(this);gainRow.setGravity(Gravity.CENTER_VERTICAL);
         gainLabel=Ui.text(this,String.format(java.util.Locale.US,"Kazanç %.1fx",liveGain),12,Color.WHITE);Ui.fitText(gainLabel,10,12,1);

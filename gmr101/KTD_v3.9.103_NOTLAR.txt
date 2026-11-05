@@ -1,0 +1,8 @@
+KTD 3D ANALYZER v3.9.103
+- Tum paletlerde GMR anomali vurgusu icin hassasiyet Dusuk / Orta / Yuksek
+- Renk gecisi Yumusak / Normal / Sert
+- Mavi negatif, mineral benzeri ve kirmizi pozitif gorsel esikleri
+- Kaydedilen ayarlar 2D, 3D, 4D, GMR canli goruntude yeniden kullanilir
+- Her ekranda AKILLI RENK dugmesi, genel Ayarlarda renk kontrol karti
+- Isaret / sinyal siddetine gore gorsel yorumdur, kesin malzeme tanisi degildir
+- Ham sensor ornegi, derinlik ve kayit verileri degistirilmedi

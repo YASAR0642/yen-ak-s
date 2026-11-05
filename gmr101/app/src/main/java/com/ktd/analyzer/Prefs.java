@@ -8,6 +8,20 @@ public final class Prefs {
     private Prefs() {}
     private static SharedPreferences p(Context c){ return c.getSharedPreferences(N, Context.MODE_PRIVATE); }
 
+    /** Yalniz goruntuleme tercihi; ham sensor, referans, kayit ve derinlik etkilenmez. */
+    public static int smartSensitivity(Context c){return clamp(p(c).getInt("smart_sensitivity",1),0,2);}
+    public static int smartTransition(Context c){return clamp(p(c).getInt("smart_transition",1),0,2);}
+    public static int smartBlueThreshold(Context c){return clamp(p(c).getInt("smart_blue",20),5,85);}
+    public static int smartMineralThreshold(Context c){return clamp(p(c).getInt("smart_mineral",28),5,85);}
+    public static int smartRedThreshold(Context c){return clamp(p(c).getInt("smart_red",48),15,95);}
+    public static void setSmartColors(Context c,int sensitivity,int transition,int blue,int mineral,int red){
+        p(c).edit().putInt("smart_sensitivity",clamp(sensitivity,0,2))
+            .putInt("smart_transition",clamp(transition,0,2))
+            .putInt("smart_blue",clamp(blue,5,85))
+            .putInt("smart_mineral",clamp(mineral,5,85))
+            .putInt("smart_red",clamp(red,15,95)).apply();
+    }
+
     public static int rows(Context c){ return p(c).getInt("rows", 6); }
     public static int cols(Context c){ return p(c).getInt("cols", 10); }
     /** v3.5.2: saha örnekleme hücresi sabit 30 x 30 cm'dir. */

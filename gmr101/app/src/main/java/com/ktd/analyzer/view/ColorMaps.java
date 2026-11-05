@@ -1,6 +1,8 @@
 package com.ktd.analyzer.view;
 
 import android.graphics.Color;
+import android.content.Context;
+import com.ktd.analyzer.Prefs;
 
 /**
  * KTD renk paletleri.
@@ -14,6 +16,16 @@ public final class ColorMaps {
         "Bakır", "Viridis", "Boşluk İçi Metal", "KTD VOLENDER", "ODA", "Malzeme", "Visualizer Klasik", "GER / KTD Anomali", "KTD 6 Renk Deney", "Küp / Turuncu", "Boşluk / Mavi", "Dolgu / Buz Mavisi", "Demir / Siyah", "Metal / Kırmızı", "KTD Polarite (+/-)"
     };
     private ColorMaps(){}
+    private static volatile int sensitivity=1, transition=1;
+    private static volatile float blueThreshold=.20f, mineralThreshold=.28f, redThreshold=.48f;
+    public static void configure(Context context){
+        sensitivity=Prefs.smartSensitivity(context);
+        transition=Prefs.smartTransition(context);
+        blueThreshold=Prefs.smartBlueThreshold(context)/100f;
+        mineralThreshold=Prefs.smartMineralThreshold(context)/100f;
+        redThreshold=Prefs.smartRedThreshold(context)/100f;
+    }
+
 
     private static final PaletteData P8=new PaletteData(
         new float[]{0.00000000f,0.37800688f,0.40893471f,0.42268041f,0.55326461f,0.59106530f,0.66323024f,0.67697595f,0.75601375f,0.79111842f,0.81907895f,0.85855263f,0.88160056f,0.89690722f,0.92096220f,0.93658338f,0.94736842f,0.94799930f,0.97532895f,1.00000000f},
@@ -95,42 +107,32 @@ public final class ColorMaps {
      * Bu bir teshis DEGILDIR; gorsel yorum yardimidir.
      */
     private static int smartOverlay(int palette,float value,float maxAbs,int base){
-        if(!Float.isFinite(value)) return base;
-        float abs=Math.abs(value);
-        float rel=abs/Math.max(1f,maxAbs);
-        // Kucuk zemin dalgalanmasinda secili paleti koru.
-        if(abs<6f || rel<0.09f) return base;
-
-        final int ground=Color.rgb(86,94,102);
-        final int cyan=Color.rgb(0,224,255);
-        final int blue=Color.rgb(0,82,255);
-        final int deepBlue=Color.rgb(0,48,221);
-        final int mineralA=Color.rgb(182,146,62);
-        final int mineralB=Color.rgb(131,103,41);
-        final int mineralC=Color.rgb(97,79,34);
-        final int red=Color.rgb(255,34,26);
-        final int deepRed=Color.rgb(198,0,0);
-
-        // Negatif tarafta bosluk benzeri net mavi kontur.
+        if(!Float.isFinite(value))return base;
+        // 0 Dusuk, 1 Orta, 2 Yuksek: yalniz gorsel esikleri kaydirir.
+        final float sensitivityFactor=sensitivity==0?1.25f:(sensitivity==2?.75f:1f);
+        float rel=Math.abs(value)/Math.max(1f,maxAbs);
+        float noise=.09f*sensitivityFactor;
+        if(Math.abs(value)<6f || rel<noise)return base;
+        final int cyan=Color.rgb(0,224,255),blue=Color.rgb(0,82,255),deepBlue=Color.rgb(0,48,221);
+        final int mineralA=Color.rgb(182,146,62),mineralB=Color.rgb(131,103,41),mineralC=Color.rgb(97,79,34);
+        final int red=Color.rgb(255,34,26),deepRed=Color.rgb(198,0,0);
+        // Sert gecis keskin renk siniri verir; yumusak gecis araligi genisletir.
+        float fade=transition==0?.14f:(transition==2?.015f:.065f);
         if(value<0f){
-            if(rel<0.16f) return lerp(base,cyan,(rel-0.09f)/0.07f);
-            if(rel<0.28f) return lerp(cyan,blue,(rel-0.16f)/0.12f);
-            return lerp(blue,deepBlue,clamp01((rel-0.28f)/0.42f));
+            float start=Math.max(noise,blueThreshold*sensitivityFactor);
+            if(rel<start-fade)return base;
+            if(rel<start)return lerp(base,cyan,clamp01((rel-(start-fade))/Math.max(.001f,fade)));
+            if(rel<start+fade)return lerp(cyan,blue,clamp01((rel-start)/Math.max(.001f,fade)));
+            return lerp(blue,deepBlue,clamp01((rel-start-fade)/.38f));
         }
-
-        // Pozitif tarafta once dağınık mineral benzeri tonlar, sonra tam metal kirmizisi.
-        if(rel<0.19f){
-            float f=clamp01((rel-0.09f)/0.10f);
-            int mineral=chooseMineralColor(value,mineralA,mineralB,mineralC);
-            return lerp(base,mineral,f);
-        }
-        if(rel<0.34f){
-            return chooseMineralColor(value,mineralA,mineralB,mineralC);
-        }
-        if(rel<0.48f){
-            return lerp(chooseMineralColor(value,mineralA,mineralB,mineralC),red,clamp01((rel-0.34f)/0.14f));
-        }
-        return lerp(red,deepRed,clamp01((rel-0.48f)/0.42f));
+        float mineralStart=Math.max(noise,mineralThreshold*sensitivityFactor);
+        float metalStart=Math.max(mineralStart+.04f,redThreshold*sensitivityFactor);
+        int mineral=chooseMineralColor(value,mineralA,mineralB,mineralC);
+        if(rel<mineralStart-fade)return base;
+        if(rel<mineralStart)return lerp(base,mineral,clamp01((rel-mineralStart+fade)/Math.max(.001f,fade)));
+        if(rel<metalStart-fade)return mineral;
+        if(rel<metalStart)return lerp(mineral,red,clamp01((rel-metalStart+fade)/Math.max(.001f,fade)));
+        return lerp(red,deepRed,clamp01((rel-metalStart)/.40f));
     }
 
     private static int chooseMineralColor(float value,int a,int b,int c){

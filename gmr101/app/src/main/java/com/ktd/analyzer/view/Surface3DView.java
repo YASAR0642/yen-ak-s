@@ -15,7 +15,7 @@ import com.ktd.analyzer.data.ScanData;
 public final class Surface3DView extends View {
     public static final int ADVANCED=0,SURFACE=1,CONTOUR=2,VLAYER=3,WIREFRAME=4;
     private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG); private ScanData data; private int palette=0,mode=ADVANCED; private float yaw=-35f,pitch=56f,zoom=1f;private float lastX,lastY;private final ScaleGestureDetector scaler;
-    public Surface3DView(Context c){super(c);setBackgroundColor(Color.rgb(5,11,16));palette=Prefs.palette(c);scaler=new ScaleGestureDetector(c,new ScaleGestureDetector.SimpleOnScaleGestureListener(){public boolean onScale(ScaleGestureDetector d){zoom=Math.max(.55f,Math.min(3f,zoom*d.getScaleFactor()));invalidate();return true;}});}
+    public Surface3DView(Context c){super(c);ColorMaps.configure(c);setBackgroundColor(Color.rgb(5,11,16));palette=Prefs.palette(c);scaler=new ScaleGestureDetector(c,new ScaleGestureDetector.SimpleOnScaleGestureListener(){public boolean onScale(ScaleGestureDetector d){zoom=Math.max(.55f,Math.min(3f,zoom*d.getScaleFactor()));invalidate();return true;}});}
     public void setData(ScanData d){data=d;invalidate();}
     public void setPalette(int p){palette=p;invalidate();}
     public void setMode(int m){mode=m;invalidate();}
