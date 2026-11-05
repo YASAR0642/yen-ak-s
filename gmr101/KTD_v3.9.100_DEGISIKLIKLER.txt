@@ -1,0 +1,6 @@
+KTD 3D ANALYZER v3.9.100
+- Aktivasyon ekranindaki AKTIVE ET dugmesi ekranin altinda sabit tutuldu.
+- Aktivasyon formu kucuk ekran ve buyuk yazi olceklerinde kaydirilabilir yapildi.
+- Klavye acildiginda aktivasyon ekraninin yeniden boyutlandirilmasi istendi.
+- 2D, 3D, 4D, Bluetooth ve derinlik hesaplamalarina dokunulmadi.
+- Android cihazda APK derleme / Samsung S25 Ultra fiziksel test yapilmadi.

@@ -1,0 +1,7 @@
+KTD 3D ANALYZER v3.9.101
+
+Yalnizca GMR canli radargram akisi gorsel ilerleme hizi %50 azaltildi.
+GMR canli gorunumde yatay pencere 72 sutundan 144 sutuna cikarildi; her olcumun piksel ilerlemesi yariya iner.
+Bluetooth RATE=100, orneklerin alinmasi, kayit, dosya oynatma, 2D/3D/4D ve derinlik hesaplari degistirilmedi.
+
+Not: APK telefon uzerinde test edilmedi.

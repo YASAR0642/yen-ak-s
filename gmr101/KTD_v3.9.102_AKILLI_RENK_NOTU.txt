@@ -1,0 +1,12 @@
+KTD 3D ANALYZER v3.9.102
+
+Yapilanlar:
+- Tum renk paletlerinde ortak akilli anomali vurgulama eklendi.
+- Zemin secili palette kalir.
+- Negatif guclu anomaliler net mavi tonlarla vurgulanir.
+- Pozitif orta anomaliler mineral benzeri daginik amber/kahve tonlariyla gosterilir.
+- Pozitif guclu anomaliler net kirmizi metal benzeri gorunum alir.
+- 4D hacimde zayif/orta pozitif anomalilerin gereksiz yayilimi azaltildi.
+- IsoSurface gorunumunde de pozitif mineral benzeri yumusak yayilim kucultuldu.
+
+Not: Bu renkler otomatik yorum yardimidir; kesin malzeme teshisi degildir.
