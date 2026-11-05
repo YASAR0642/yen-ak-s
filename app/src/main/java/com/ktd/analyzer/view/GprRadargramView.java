@@ -34,17 +34,24 @@ public final class GprRadargramView extends View {
     private long lastSequence=-1;
     // X is a measured distance only when the stream/file supplies dxMeters.
     private double traceStride=1.0;
+    private boolean originalSequenceDistance=false;
     private long totalDisplayedTraces=0;
     private boolean fastLive=false;
     private float cursorX=Float.NaN,cursorY=Float.NaN;
     private boolean cursorActive=false;
     private int firstVisibleTrace=0,currentWindow=VISIBLE_TRACES;
     private int graphLeft,graphTop,graphWidth,graphHeight;
+    /** Imported recordings retain their original trace indices when preview is downsampled. */
+    public void setOriginalSequenceDistance(boolean enabled){originalSequenceDistance=enabled;invalidate();}
     public void setTraceStride(double stride){traceStride=Double.isFinite(stride)&&stride>0?stride:1.0;invalidate();}
     public void setFastLive(boolean fast){fastLive=fast;invalidate();}
     public boolean hasDistanceCalibration(){return Double.isFinite(dxMeters)&&dxMeters>0;}
-    public double totalTravelMeters(){return hasDistanceCalibration()&&totalDisplayedTraces>0?
-        Math.max(0,(totalDisplayedTraces-1)*dxMeters*traceStride):Double.NaN;}
+    public double totalTravelMeters(){
+        if(!hasDistanceCalibration()||totalDisplayedTraces<=0)return Double.NaN;
+        double position=originalSequenceDistance&&lastSequence>=1?
+            (lastSequence-1):(totalDisplayedTraces-1)*traceStride;
+        return Math.max(0,position*dxMeters);
+    }
     @Override public boolean onTouchEvent(MotionEvent event){
         switch(event.getActionMasked()){
             case MotionEvent.ACTION_DOWN:

@@ -1,0 +1,17 @@
+KTD GPR SYSTEM v1.0.6 | GPR ekran duzeni korunmustur.
+
+AYARLAR:
+- RENK OLUSTUR: 10 RGB rengiyle yeni palet olusturma; isimlendirme.
+- KAYITLI RENKLER: kayitli palet secme, 10 rengi duzenleme, yeniden kaydetme, silme.
+- GPR SINYAL/FILTRE: orijinal, DC, zemin, kenar vurgusu; otomatik kontrast.
+- MESAFE KALIBRASYONU: secili SGY/CSV dosyasi icin gercek yurünen hat uzunlugunu metre cinsinden kaydetme ve sifirlama.
+  Kalibrasyon, tum dosyalara uygulanan sabit 10x carpani DEGILDIR.
+  20130623_144600 ile baslayan, SGY basliginda ~1.4 m olan kullaniciya ait saha kaydi icin
+  kullanicinin dogruladigi 14 m uzunluk bir kez kaydedilir; ayarlardan degistirilebilir.
+  Farkli SGY dosyalarinin mesafesi otomatik 10x yapilmaz.
+- Yatay ilerleme, SAGLANAN iz koordinati / hat kalibrasyonu ile hesaplanir.
+- Zaman/ns kaynakli derinlik kalibrasyonu ve yatay mesafe birbirine karistirilmaz.
+- 2x akis, Bluetooth, sagdaki G1-G4 grafikleri, mevcut ses kontrolleri korunmustur.
+
+TANIM: Bu kaynak paketi bilgisayarda Android APK olarak derlenmemistir.
+Kaynak dosyalari ve ZIP yapisi kontrol edilmistir. Cihaz testleri gereklidir.

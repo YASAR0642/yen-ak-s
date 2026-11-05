@@ -63,6 +63,18 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
     private boolean fileMode=false,playingFile=false;
     private int replayPosition=0, replaySpeed=1;
     private double loadedDxMeters=Double.NaN;
+    private String loadedFileKey="";
+    private boolean fileHasSequentialTraceNumbers=false;
+    private double calibratedDxMeters(){
+        if(!fileMode||loadedTraces.size()<2)return loadedDxMeters;
+        double actual=GprDistanceCalibration.get(this,loadedFileKey);
+        return Double.isFinite(actual)&&actual>0?actual/(loadedTraces.size()-1.0):loadedDxMeters;
+    }
+    private void applyImportedDistance(){
+        if(!fileMode||radar==null)return;
+        radar.setOriginalSequenceDistance(fileHasSequentialTraceNumbers);
+        radar.setImportedMeta(Double.isFinite(timeOverrideNs)?timeOverrideNs:lastDeviceNs,calibratedDxMeters(),false);
+    }
     private double reportedAntennaMhz=Double.NaN,reportedPulseWidthNs=Double.NaN;
     private double estimatedAntennaMhz=Double.NaN,estimatedPulseWidthNs=Double.NaN;
     private double detectedWindowNs=Double.NaN;
@@ -85,7 +97,7 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
             final int playedIndex=replayPosition-1;
             // Preview chooses floor(k*total/columns); replay chooses the identical indices.
             final int column=(int)(((long)playedIndex*columns+total-1)/total);
-            if(column<columns && (int)((long)column*total/columns)==playedIndex) radar.add(trace);
+            if((column<columns && (int)((long)column*total/columns)==playedIndex) || replayPosition==total) radar.add(trace);
             count++;
             alertSignal(trace);
         }
@@ -126,7 +138,16 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
         ui.removeCallbacks(flush);ui.removeCallbacks(replayTick);playingFile=false;hyperbolaDetector.reset();synchronized(guard){queue.clear();flushScheduled=false;}
         super.onStop();
     }
-    @Override protected void onResume(){super.onResume();com.ktd.analyzer.view.ColorMaps.configure(this);selectedPalette=Prefs.palette(this);if(radar!=null)radar.setPalette(selectedPalette);}
+    @Override protected void onResume(){
+        super.onResume();com.ktd.analyzer.view.ColorMaps.configure(this);
+        selectedPalette=Prefs.palette(this);
+        if(radar!=null){
+            radar.setPalette(selectedPalette);
+            radar.setFilterMode(getSharedPreferences("gpr_options",0).getInt("display_filter",0));
+            radar.setAutoContrast(getSharedPreferences("gpr_options",0).getBoolean("auto_contrast",true));
+            applyImportedDistance();
+        }
+    }
     @Override protected void onDestroy(){if(tone!=null){tone.release();tone=null;}if(voiceGuide!=null)voiceGuide.shutdown();super.onDestroy();}
     private int dp(float v){return Ui.dp(this,v);}
     private TextView text(String value,int size){
@@ -144,7 +165,16 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
         LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(Color.rgb(5,15,23));root.setPadding(dp(4),dp(3),dp(4),dp(3));
         LinearLayout head=new LinearLayout(this);head.setGravity(Gravity.CENTER_VERTICAL);
-        Button back=action("AYARLAR");back.setOnClickListener(v->startActivity(new Intent(this,GprSettingsActivity.class)));
+        Button back=action("AYARLAR");back.setOnClickListener(v->{
+            Intent settings=new Intent(this,GprSettingsActivity.class);
+            if(fileMode&&!loadedTraces.isEmpty()){
+                settings.putExtra("gpr_file_key",loadedFileKey);
+                settings.putExtra("gpr_trace_count",loadedTraces.size());
+                settings.putExtra("gpr_header_distance",Double.isFinite(loadedDxMeters)?
+                    loadedDxMeters*(loadedTraces.size()-1):Double.NaN);
+            }
+            startActivity(settings);
+        });
         head.addView(back,new LinearLayout.LayoutParams(dp(92),dp(38)));
         TextView title=text("KTD GPR SYSTEM",20);title.setGravity(Gravity.CENTER_VERTICAL);title.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
         head.addView(title,new LinearLayout.LayoutParams(0,dp(40),1));
@@ -264,7 +294,7 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
         if(fromBeginning||replayPosition==0||replayPosition>=loadedTraces.size()){
             hyperbolaDetector.reset();
             replayPosition=0;count=0;radar.resetSession();panels.invalidate();
-            radar.setImportedMeta(Double.isFinite(timeOverrideNs)?timeOverrideNs:lastDeviceNs,loadedDxMeters,false);
+            applyImportedDistance();
             radar.setFastLive(false);
             radar.setTraceStride(loadedTraces.size()/(double)Math.max(1,Math.min(180,loadedTraces.size())));
         }
@@ -288,7 +318,7 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
     private void start(){
         if(!BluetoothClient.isConnected()){bluetooth.pickPaired(this);return;}
         stopPlayback();fileMode=false;loadedTraces.clear();
-        radar.resetSession();radar.setFastLive(true);radar.setTraceStride(1);hyperbolaDetector.reset();count=0;panels.invalidate();
+        radar.resetSession();radar.setOriginalSequenceDistance(false);radar.setFastLive(true);radar.setTraceStride(1);hyperbolaDetector.reset();count=0;panels.invalidate();
         resetDeviceAuto();
         wanted=true;
         if(bluetooth.send("GPR_START\n")){
@@ -342,12 +372,12 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
     }
     private void showFullPreview(){
         radar.resetSession();radar.setFastLive(false);radar.setTraceStride(loadedTraces.size()/(double)Math.max(1,Math.min(180,loadedTraces.size())));count=0;
-        radar.setImportedMeta(Double.isFinite(timeOverrideNs)?timeOverrideNs:lastDeviceNs,loadedDxMeters,false);
+        applyImportedDistance();
         // Complete recording is represented in the fixed-width preview without dropping its timeline.
         int total=loadedTraces.size();
         final int columns=Math.min(180,total);
         for(int k=0;k<columns;k++){
-            int idx=(int)((long)k*total/columns);
+            int idx=(k==columns-1)?total-1:(int)((long)k*total/columns);
             radar.add(loadedTraces.get(idx));
         }
         panels.invalidate();updateFooter();
@@ -420,12 +450,26 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
                     if(input==null)throw new java.io.IOException("Dosya okunamadı");
                     rec=csv?GprFileIo.readCsv(input):GprFileIo.readSegy(input);
                 }
+                final String importedName=(filename==null||filename.trim().isEmpty())?
+                    String.valueOf(uri.getLastPathSegment()):filename;
                 runOnUiThread(()->{
                     if(running)bluetooth.send("GPR_STOP\n");
                     running=false;wanted=false;startButton.setText("BAŞLAT");
                     stopPlayback();
                     loadedTraces.clear();loadedTraces.addAll(rec.traces);
-                    fileMode=true;replayPosition=0;count=0;lastDeviceNs=rec.dtNs;loadedDxMeters=rec.dxMeters;
+                    fileMode=true;replayPosition=0;count=0;lastDeviceNs=rec.dtNs;loadedDxMeters=rec.dxMeters;loadedFileKey=importedName;
+                    fileHasSequentialTraceNumbers=!"CSV".equals(rec.source);
+                    // Survey-specific field measurement supplied by the user: this
+                    // recording was walked over 14 m although its SEG-Y coordinates
+                    // imply ~1.4 m. Never apply the correction to other recordings.
+                    double fileHeaderLength=Double.isFinite(rec.dxMeters)?
+                        rec.dxMeters*Math.max(0,rec.traces.size()-1):Double.NaN;
+                    if(importedName.toUpperCase(Locale.ROOT).startsWith("20130623_144600")
+                        && Double.isFinite(fileHeaderLength)
+                        && fileHeaderLength>=1.2 && fileHeaderLength<=1.6
+                        && !Double.isFinite(GprDistanceCalibration.get(this,importedName))){
+                        GprDistanceCalibration.set(this,importedName,14.0);
+                    }
                     if(Double.isFinite(rec.dielectric) && rec.dielectric>=1 && rec.dielectric<=100){
                         eps=rec.dielectric;radar.setEpsilon(eps);
                     }
@@ -438,7 +482,7 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
                     detectedWindowNs=rec.traces.isEmpty()||!Double.isFinite(rec.dtNs)?Double.NaN:rec.traces.get(0).samples.length*rec.dtNs;
                     updateAutoLabels();
                     radar.resetSession();
-                    radar.setImportedMeta(Double.isFinite(timeOverrideNs)?timeOverrideNs:rec.dtNs,rec.dxMeters,false);
+                    applyImportedDistance();
                     radar.setFastLive(false);
                     hyperbolaDetector.reset();
                     // Opening a file must only preview the whole recording. PLAY begins acquisition-style replay.
