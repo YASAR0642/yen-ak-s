@@ -610,10 +610,10 @@ public final class LiveGprActivity extends Activity implements BluetoothClient.L
         // Only real traces or genuine file records, never device demo modes.
         if(!fileMode && (wasDemo||radar.isDemo()))return;
         long now=SystemClock.elapsedRealtime();
-        if(now-lastAudio<4000)return;
+        if(now-lastAudio<700)return;
         lastAudio=now;
         if(!sound)return;
-        if(voiceGuide!=null)voiceGuide.say("Olası boşluk anomalisi");
+        if(voiceGuide!=null)voiceGuide.say("Boşluk");
         if(tone!=null)try{tone.startTone(ToneGenerator.TONE_PROP_BEEP,95);}catch(Exception ignored){}
     }
 

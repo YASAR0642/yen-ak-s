@@ -1,0 +1,21 @@
+KTD GPR SYSTEM v1.0.8 - Hiperbol sesli uyarı duzeltmesi
+
+Temel: v1.0.7 kaynak kodu. Yalnizca gpr/HyperbolaEventDetector.java
+ve LiveGprActivity.java ses komutu ile ses araligi duzenlendi.
+
+- Ekran rengine, parlakliga veya kazanc seviyesine gore ses uretmez.
+- 171 ardışık ham GPR izinde iki kollu parabolik yansima arar.
+- Soldaki ve sagdaki kollar tamamlanmadan ses vermez.
+- Guclu yatay tabakalar icin yatay medyan zemini cikarir.
+- Bir bulgunun esitlenmesi/yeniden uyarilmasini minimum 95 iz araligiyla engeller.
+- Her dogrulanan geometri icin bir kez 'Bosluk' ses metni kullanir.
+- Ses acma/kapatma dugmesi aynen korunmustur.
+
+Test: 20130623_144600(6).SGY (1407 iz): 3 geometri uyarisi
+      Duz tabakali + rastgele gurultulu sentetik veri: 0 uyarı.
+
+UYARI: Hiperbol, jeofizik olarak tek basina gercek bosluk/oda kaniti degildir.
+Bu ses metni kullaniciya ozgudur; geometri siniflandirmasi icin sahada
+farkli zemin ve cihazlarla dogrulama gerekir.
+
+APK derleme ve gercek telefon/cihaz testi bu pakette yapilmamistir.

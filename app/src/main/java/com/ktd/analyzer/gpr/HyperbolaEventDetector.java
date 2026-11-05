@@ -1,73 +1,115 @@
 package com.ktd.analyzer.gpr;
 
 import java.util.ArrayDeque;
+import java.util.Arrays;
 
 /**
- * Cautious geometric hyperbola-like reflector heuristic, NOT a void classifier.
- * Uses only measured GPR traces. A window with a shallow central apex and
- * two deeper symmetric arms can trigger a single event. A trace cooldown
- * prevents announcements while the same shape continues through the display.
+ * On-line, colour-independent detector of a *completed* two-armed GPR echo.
+ * It does not identify the material or establish the existence of a void.
+ * A delayed event is emitted after both arms have been acquired and a local
+ * match maximum has passed. All thresholds apply to raw samples, not to gain
+ * or rendered RGB pixels.
  */
 public final class HyperbolaEventDetector {
-    private static final int WINDOW=17;
-    private static final int COOLDOWN_TRACES=100;
-    private final ArrayDeque<short[]> recent=new ArrayDeque<>();
-    private int samples=0;
-    private int cooldown=0;
-    private boolean armed=true;
-    private int quietTraces=0;
-    public void reset(){recent.clear();samples=0;cooldown=0;armed=true;quietTraces=0;}
-    public boolean accept(GprProtocol.Trace trace){
-        if(trace==null||trace.samples==null||trace.samples.length<80)return false;
-        if(samples!=0&&samples!=trace.samples.length)reset();
-        samples=trace.samples.length;
-        recent.addLast(trace.samples);
-        if(recent.size()>WINDOW)recent.removeFirst();
-        if(cooldown>0)cooldown--;
-        if(recent.size()!=WINDOW)return false;
-        short[][] a=recent.toArray(new short[WINDOW][]);
-        // Estimate background from all samples so uniform horizontal layers
-        // cannot be classified solely by having a strong return.
-        double total=0;int n=0;
-        for(int x=0;x<WINDOW;x++)for(int y=0;y<samples;y+=6){total+=Math.abs((int)a[x][y]);n++;}
-        double baseline=Math.max(8,total/Math.max(1,n));
-        int shiftMin=Math.max(3,samples/100),shiftMax=Math.max(shiftMin+3,samples/17);
-        shiftMax=Math.min(shiftMax,samples/7);
-        // The apex is at the middle trace, both arms are on either side.
-        boolean candidate=false;
-        for(int y=Math.max(12,samples/12);y<samples*4/5-shiftMax;y+=2){
-            double center=peak(a[8],y,2);
-            if(center<baseline*4.1 || center<60)continue;
-            double sideAtApex=(peak(a[2],y,2)+peak(a[14],y,2))*0.5;
-            for(int dy=shiftMin;dy<=shiftMax;dy+=Math.max(1,shiftMin/2)){
-                double left=peak(a[2],y+dy,3),right=peak(a[14],y+dy,3);
-                // Arms must be comparably strong, and displaced downward.
-                if(left<baseline*2.8||right<baseline*2.8)continue;
-                if(Math.min(left,right)<Math.max(left,right)*.42)continue;
-                if((left+right)*.5<sideAtApex*1.55)continue;
-                // Additional intermediate shoulders must connect into the two arms.
-                int half=Math.max(2,dy/2);
-                double shoulderL=peak(a[5],y+half,3),shoulderR=peak(a[11],y+half,3);
-                if(shoulderL<baseline*2.4||shoulderR<baseline*2.4)continue;
-                // Ordinary horizontal bands should not win merely by high amplitude.
-                if(center<sideAtApex*1.35)continue;
-                candidate=true;break;
-            }
-            if(candidate)break;
-        }
-        if(!candidate){
-            if(++quietTraces>=WINDOW*3 && cooldown==0)armed=true;
-            return false;
-        }
-        quietTraces=0;
-        if(!armed||cooldown>0)return false;
-        armed=false;cooldown=COOLDOWN_TRACES;
-        return true;
+    private static final int WINDOW=171, MID=85;
+    private static final int[] X={-75,-55,-35,-17,0,17,35,55,75};
+    private static final int[] CURVATURE={50,62,74,86,98,110,122,134};
+    private static final int[] BASE_X={-60,-50,-40,-30,-20,-10,0,10,20,30,40,50,60};
+    private static final int MIN_SEPARATION=95;
+    private final ArrayDeque<short[]> window=new ArrayDeque<>();
+    private int samples;
+    private long total, previousPeak=-100000, pendingCenter=-1;
+    private float pendingBest;
+    private int fallingSteps;
+
+    public void reset(){
+        window.clear();samples=0;total=0;previousPeak=-100000;
+        pendingCenter=-1;pendingBest=0;fallingSteps=0;
     }
-    private static double peak(short[] values,int center,int radius){
-        int best=0;
-        for(int i=Math.max(0,center-radius);i<=Math.min(values.length-1,center+radius);i++)
-            best=Math.max(best,Math.abs((int)values[i]));
-        return best;
+
+    public boolean accept(GprProtocol.Trace trace){
+        if(trace==null||trace.samples==null||trace.samples.length<160)return false;
+        if(samples!=0&&samples!=trace.samples.length)reset();
+        samples=trace.samples.length;total++;
+        window.addLast(trace.samples);
+        if(window.size()>WINDOW)window.removeFirst();
+        if(window.size()<WINDOW || total%3!=0)return false;
+        // The center is 85 traces behind the newest trace: right arm is present.
+        long center=total-MID-1;
+        short[][] raw=window.toArray(new short[WINDOW][]);
+        float score=bestMatch(raw);
+        if(score>0){
+            if(pendingCenter<0 || score>pendingBest){
+                pendingBest=score;pendingCenter=center;fallingSteps=0;
+            }else if(score<pendingBest*.78f){
+                fallingSteps++;
+            }else fallingSteps=0;
+        }else if(pendingCenter>=0){
+            fallingSteps++;
+        }
+        // Do not announce during first matching frame. Wait for matching
+        // scores to fall, which marks the end of the candidate apex region.
+        if(pendingCenter>=0 && fallingSteps>=3){
+            long matched=pendingCenter;
+            pendingCenter=-1;pendingBest=0;fallingSteps=0;
+            if(matched-previousPeak<MIN_SEPARATION)return false;
+            previousPeak=matched;
+            return true;
+        }
+        // If the candidate has remained high for too many traces, it is more
+        // likely a layer than a localized target; discard without speech.
+        if(pendingCenter>=0 && center-pendingCenter>75){
+            pendingCenter=-1;pendingBest=0;fallingSteps=0;
+        }
+        return false;
+    }
+
+    private float bestMatch(short[][] raw){
+        int n=samples;
+        int first=Math.max(70,(int)(n*.45f));
+        int last=Math.min(n-140,(int)(n*.77f));
+        if(last<=first)return 0;
+        int[] base=new int[n];
+        int[][] contrast=new int[X.length][n];
+        int max=1;
+        for(short sample:raw[MID])max=Math.max(max,Math.abs((int)sample));
+        // Five-point vertical envelope on raw echo, horizontal robust
+        // background median to suppress constant flat reflectors.
+        for(int y=first;y<Math.min(n-4,last+135);y++){
+            int[] values=new int[BASE_X.length];
+            for(int j=0;j<BASE_X.length;j++){
+                int m=0;short[] t=raw[MID+BASE_X[j]];
+                for(int dy=-4;dy<=4;dy++)m=Math.max(m,Math.abs((int)t[y+dy]));
+                values[j]=m;
+            }
+            Arrays.sort(values);
+            base[y]=values[values.length/2];
+            for(int j=0;j<X.length;j++){
+                int m=0;short[] t=raw[MID+X[j]];
+                for(int dy=-4;dy<=4;dy++)m=Math.max(m,Math.abs((int)t[y+dy]));
+                contrast[j][y]=Math.max(0,m-base[y]);
+                max=Math.max(max,m);
+            }
+        }
+        float best=0;
+        int[] v=new int[9];
+        for(int bend:CURVATURE){
+            for(int y=first;y<=last;y+=5){
+                for(int i=0;i<X.length;i++){
+                    int yy=y+(int)(bend*(X[i]/75.0)*(X[i]/75.0));
+                    v[i]=contrast[i][yy];
+                }
+                // Apex, left/right arms, three widths: at least 7/9 ridge
+                // samples must be strong; the weakest point also matters.
+                int min=Integer.MAX_VALUE;
+                for(int a:v)min=Math.min(min,a);
+                int[] sorted=v.clone();Arrays.sort(sorted);
+                float score=.65f*sorted[2]+.35f*min;
+                if(score>best)best=score;
+            }
+        }
+        // A conservative within-window amplitude ratio. This is an
+        // empirical visual-event threshold, not a calibrated void classifier.
+        return best>=Math.max(45f,max*.035f)?best:0f;
     }
 }
