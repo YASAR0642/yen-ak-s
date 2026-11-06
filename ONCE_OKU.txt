@@ -1,0 +1,10 @@
+KTD AKTIVASYON YONETICI v1.0.4 — GITHUB
+
+1. GitHub'da yeni PRIVATE repository olusturun.
+2. ZIP'i bilgisayarda ACIN; icindeki tum dosyalari repo KOKUNE yukleyin.
+3. .github/workflows/build-ktd-admin.yml dosyasi yerinde olmali.
+4. Actions > Build KTD Aktivasyon Yonetici APK v1.0.4 > Run workflow.
+5. Basarili derleme sonrasi Artifacts'tan APK'yi indirin.
+
+DIKKAT: Uygulama kaynak kodunda OZEL AKTIVASYON ANAHTARI bulunuyor.
+Reponuzu PUBLIC yapmayin.

@@ -1,0 +1,6 @@
+KTD Aktivasyon Yönetici v1.0.4 arayüz düzeltmeleri
+- KOPYALA ve PAYLAŞ butonlarının px yerine dp ile yüksekliği düzeltildi.
+- Güvenlik ekran görüntüsü bilgilendirme metni kaldırıldı (ekran görüntüsü koruması kodda korunuyor).
+- Başlıklar, açıklama metinleri ve etiketlerin okunabilirliği artırıldı.
+- Dar ekranlarda metinlerin kesilmemesi için başlık alanları içerik yüksekliğine göre ayarlandı.
+- Aktivasyon ve güvenlik algoritmalarında değişiklik yapılmadı.
