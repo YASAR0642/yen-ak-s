@@ -17,13 +17,8 @@ public final class GprFileIo {
     private GprFileIo(){}
     public static final class Record {
         public final List<GprProtocol.Trace> traces;
-        public final double dtNs,dxMeters,antennaMhz,pulseWidthNs,dielectric;
-        public final String source;
-        public Record(List<GprProtocol.Trace> t,double ns,double dx){this(t,ns,dx,Double.NaN,Double.NaN,"CSV",Double.NaN);}
-        public Record(List<GprProtocol.Trace> t,double ns,double dx,double mhz,double pulse,String src){this(t,ns,dx,mhz,pulse,src,Double.NaN);}
-        public Record(List<GprProtocol.Trace> t,double ns,double dx,double mhz,double pulse,String src,double er){
-            traces=t;dtNs=ns;dxMeters=dx;antennaMhz=mhz;pulseWidthNs=pulse;source=src;dielectric=er;
-        }
+        public final double dtNs,dxMeters;
+        public Record(List<GprProtocol.Trace> t,double ns,double dx){traces=t;dtNs=ns;dxMeters=dx;}
     }
     public static void writeCsv(OutputStream out,List<GprProtocol.Trace> traces,double ns,double dx)throws IOException {
         BufferedWriter writer=new BufferedWriter(new OutputStreamWriter(out,StandardCharsets.UTF_8));
@@ -42,7 +37,7 @@ public final class GprFileIo {
     private static String number(double d){return Double.isFinite(d)&&d>0?String.format(Locale.US,"%.9g",d):"NaN";}
     public static Record readCsv(InputStream in)throws IOException {
         BufferedReader br=new BufferedReader(new InputStreamReader(in,StandardCharsets.UTF_8));
-        double ns=Double.NaN,dx=Double.NaN,mhz=Double.NaN,pulse=Double.NaN;
+        double ns=Double.NaN,dx=Double.NaN;
         List<GprProtocol.Trace> traces=new ArrayList<>();
         String line; int n=0;
         while((line=br.readLine())!=null){
@@ -50,9 +45,7 @@ public final class GprFileIo {
                 String[] tokens=line.split(",");
                 for(int k=1;k+1<tokens.length;k+=2){
                     try{if("NS_PER_SAMPLE".equals(tokens[k]))ns=Double.parseDouble(tokens[k+1]);
-                        else if("DX_M".equals(tokens[k]))dx=Double.parseDouble(tokens[k+1]);
-                        else if("ANTENNA_MHZ".equals(tokens[k]))mhz=Double.parseDouble(tokens[k+1]);
-                        else if("PULSE_WIDTH_NS".equals(tokens[k]))pulse=Double.parseDouble(tokens[k+1]);}
+                        else if("DX_M".equals(tokens[k]))dx=Double.parseDouble(tokens[k+1]);}
                     catch(NumberFormatException ignored){}
                 }
                 continue;
@@ -72,7 +65,7 @@ public final class GprFileIo {
             if(traces.size()>=100000)throw new IOException("Çok büyük CSV kaydı; kayıt bölünmeli");
         }
         if(traces.isEmpty())throw new IOException("Radar izi bulunamadı");
-        return new Record(traces,ns,dx,mhz,pulse,"CSV");
+        return new Record(traces,ns,dx);
     }
     public static boolean looksLikeSegyHeader(byte[] h){
         if(h==null||h.length<3600)return false;
@@ -115,13 +108,9 @@ public final class GprFileIo {
         // KTD PC GPR v8.5 exports SGY with a *placeholder* 1 us sample interval.
         // Never treat that placeholder as real propagation time or metre depth.
         // Prism's SEG-Y export is explicitly seismic-format-compatible, not calibrated GPR depth.
-        double prismDielectric=Double.NaN;
-        java.util.regex.Matcher epsMatch=java.util.regex.Pattern.compile("RELATIVE DIELECTRIC CONSTANT[^\\r\\n]*?E\\s*=\\s*([0-9]+(?:\\.[0-9]+)?)").matcher(textualHeader);
-        if(epsMatch.find())try{prismDielectric=Double.parseDouble(epsMatch.group(1));}catch(NumberFormatException ignored){}
         boolean prismHeader=textualHeader.contains("PRISM FOR WINDOWS")
                 || textualHeader.contains("INTENDED FOR SEISMIC (NOT GEORADAR)");
-        boolean picosecondPrism=prismHeader && (textualHeader.contains("PICOSECONDS") && textualHeader.contains("MICROSECONDS"));
-        boolean unverifiedTime=(!picosecondPrism && prismHeader) || textualHeader.contains("REAL ACQUISITION DT UNVERIFIED")
+        boolean unverifiedTime=prismHeader || textualHeader.contains("REAL ACQUISITION DT UNVERIFIED")
                 || textualHeader.contains("SAMPLE INTERVAL HEADER=1 US PLACEHOLDER");
         byte[] binary=new byte[400];exactly(in,binary);
         int interval=u16(binary,16,false),n=u16(binary,20,false),format=u16(binary,24,false);
@@ -133,25 +122,11 @@ public final class GprFileIo {
         int bytesPerSample=(format==3?2:format==8?1:4);
         if(!(format==1||format==2||format==3||format==5||format==8))throw new IOException("Desteklenmeyen SEG-Y format kodu: "+format);
         List<GprProtocol.Trace> results=new ArrayList<>();
-        // SEG-Y coordinate units are only usable if explicit units/scalar and consistent spacing exist.
-        Double firstX=null,previousX=null;double spacingSum=0;int spacingCount=0;boolean spacingConsistent=true;
         for(int i=0;i<100000;i++){
             byte[] hdr=new byte[240];
             int first=in.read();if(first==-1)break;
             hdr[0]=(byte)first;
             exactly(in,hdr,1);
-            int scalar=(short)u16(hdr,70,le);
-            int coordUnits=u16(hdr,88,le);
-            int receiverX=i32(hdr,80,le);
-            if(coordUnits==1 && scalar!=0 && receiverX!=0){
-                double x=receiverX*(scalar<0?1.0/Math.abs(scalar):scalar);
-                if(firstX==null)firstX=x;
-                if(previousX!=null){double d=Math.abs(x-previousX);
-                    if(d<1e-7 || d>10 || (spacingCount>0 && Math.abs(d-spacingSum/spacingCount)>Math.max(.001,spacingSum/spacingCount*.2)))spacingConsistent=false;
-                    else {spacingSum+=d;spacingCount++;}
-                }
-                previousX=x;
-            }else spacingConsistent=false;
             int samples=u16(hdr,114,le);
             if(samples<16||samples>GprProtocol.MAX_SAMPLES)samples=n;
             byte[] data=new byte[samples*bytesPerSample];exactly(in,data);
@@ -161,8 +136,8 @@ public final class GprFileIo {
             results.add(new GprProtocol.Trace(i+1,values));
         }
         if(results.isEmpty())throw new IOException("SEG-Y iz verisi bulunamadı");
-        double ns=!unverifiedTime && interval>0?(picosecondPrism?interval/1000.0:interval*1000.0):Double.NaN;
-        double dx=(spacingConsistent && spacingCount>=2)?spacingSum/spacingCount:Double.NaN;
-        return new Record(results,ns,dx,Double.NaN,Double.NaN,picosecondPrism?"PRISM_PICOSECONDS":"SEG-Y",prismDielectric);
+        double ns=!unverifiedTime && interval>0?interval*1000.0:Double.NaN;
+        // SEG-Y is a general seismic format; no RF ns or distance is inferred when missing.
+        return new Record(results,ns,Double.NaN);
     }
 }

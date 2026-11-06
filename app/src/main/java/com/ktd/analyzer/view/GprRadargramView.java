@@ -7,7 +7,6 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.view.View;
-import android.view.MotionEvent;
 import com.ktd.analyzer.gpr.GprProtocol;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -27,45 +26,11 @@ public final class GprRadargramView extends View {
     private int nSamples=0, maxAbsolute=100, filterMode=0, palette=0;
     private double dtNs=Double.NaN, dxMeters=Double.NaN, epsilonR=9, timeWindowNs=Double.NaN;
     private float gain=1f;
-    private final float[] depthGains={1f,1f,1f,1f,1f};
+    private final float[] depthGains={1f,1f,1f,1f};
     private int antennaMhz=300;
     private boolean estimatedTime=false;
     private boolean demo=false, hyperbolicContrast=false, autoContrast=true;
     private long lastSequence=-1;
-    // X is a measured distance only when the stream/file supplies dxMeters.
-    private double traceStride=1.0;
-    private boolean originalSequenceDistance=false;
-    private long totalDisplayedTraces=0;
-    private boolean fastLive=false;
-    private float cursorX=Float.NaN,cursorY=Float.NaN;
-    private boolean cursorActive=false;
-    private int firstVisibleTrace=0,currentWindow=VISIBLE_TRACES;
-    private int graphLeft,graphTop,graphWidth,graphHeight;
-    /** Imported recordings retain their original trace indices when preview is downsampled. */
-    public void setOriginalSequenceDistance(boolean enabled){originalSequenceDistance=enabled;invalidate();}
-    public void setTraceStride(double stride){traceStride=Double.isFinite(stride)&&stride>0?stride:1.0;invalidate();}
-    public void setFastLive(boolean fast){fastLive=fast;invalidate();}
-    public boolean hasDistanceCalibration(){return Double.isFinite(dxMeters)&&dxMeters>0;}
-    public double totalTravelMeters(){
-        if(!hasDistanceCalibration()||totalDisplayedTraces<=0)return Double.NaN;
-        double position=originalSequenceDistance&&lastSequence>=1?
-            (lastSequence-1):(totalDisplayedTraces-1)*traceStride;
-        return Math.max(0,position*dxMeters);
-    }
-    @Override public boolean onTouchEvent(MotionEvent event){
-        switch(event.getActionMasked()){
-            case MotionEvent.ACTION_DOWN:
-            case MotionEvent.ACTION_MOVE:
-                if(event.getX()<graphLeft||event.getX()>graphLeft+graphWidth
-                        ||event.getY()<graphTop||event.getY()>graphTop+graphHeight)return false;
-                cursorX=event.getX();cursorY=event.getY();cursorActive=true;invalidate();return true;
-            case MotionEvent.ACTION_UP:performClick();return true;
-            case MotionEvent.ACTION_CANCEL:return true;
-            default:return super.onTouchEvent(event);
-        }
-    }
-    @Override public boolean performClick(){super.performClick();return true;}
-
 
     public GprRadargramView(Context context){
         super(context);
@@ -73,19 +38,19 @@ public final class GprRadargramView extends View {
         label.setTextSize(10*getResources().getDisplayMetrics().scaledDensity);
         label.setColor(Color.rgb(205,224,238));
     }
-    public void clear(){traces.clear();nSamples=0;lastSequence=-1;totalDisplayedTraces=0;cursorActive=false;invalidate();}
+    public void clear(){traces.clear();nSamples=0;lastSequence=-1;invalidate();}
     public void resetSession(){clear();dtNs=Double.NaN;dxMeters=Double.NaN;demo=false;maxAbsolute=100;invalidate();}
     public void setGain(float value){gain=Math.max(0f,Math.min(10f,value));invalidate();}
     public float getGain(){return gain;}
-    public void setDepthGain(int section,float value){if(section>=0&&section<5){depthGains[section]=Math.max(0f,Math.min(10f,value));invalidate();}}
-    public float getDepthGain(int section){return depthGains[Math.max(0,Math.min(4,section))];}
+    public void setDepthGain(int section,float value){if(section>=0&&section<4){depthGains[section]=Math.max(0f,Math.min(10f,value));invalidate();}}
+    public float getDepthGain(int section){return depthGains[Math.max(0,Math.min(3,section))];}
     public void setAntennaMhz(int mhz){antennaMhz=mhz;invalidate();}
     public void setEstimatedTime(boolean value){estimatedTime=value;invalidate();}
     public void setEpsilon(double value){epsilonR=Math.max(1,Math.min(50,value));invalidate();}
     public double getEpsilon(){return epsilonR;}
     public void setFilterMode(int f){filterMode=Math.max(0,Math.min(3,f));invalidate();}
     public int getFilterMode(){return filterMode;}
-    public void setPalette(int v){palette=Math.max(0,Math.min(com.ktd.analyzer.view.ColorMaps.count()-1,v));invalidate();}
+    public void setPalette(int v){palette=Math.max(0,Math.min(2,v));invalidate();}
     public int getPalette(){return palette;}
     public void setHyperbolaEnhance(boolean v){hyperbolicContrast=v;invalidate();}
     public void setAutoContrast(boolean v){autoContrast=v;invalidate();}
@@ -108,12 +73,20 @@ public final class GprRadargramView extends View {
         int peak=1;for(short s:t.samples)peak=Math.max(peak,Math.abs((int)s));
         maxAbsolute=Math.max(8,Math.round(maxAbsolute*.90f+peak*.10f));
         if(traces.size()>=MAX_TRACES)traces.removeFirst();
-        traces.addLast(t);totalDisplayedTraces++;invalidate();
+        traces.addLast(t);invalidate();
     }
     private int shade(double signed){
-        // Bipolar echo-amplitude colour only: neither physical object nor depth identification.
-        float v=(float)Math.max(-1.0,Math.min(1.0,signed));
-        return ColorMaps.color(palette,v*100f,100f);
+        double v=Math.max(-1,Math.min(1,signed));
+        if(palette==PALETTE_GRAY){
+            int grey=Math.min(255,Math.max(0,(int)Math.round(128+125*v)));
+            return Color.rgb(grey,grey,grey);
+        }
+        if(palette==PALETTE_SEPIA){
+            int g=Math.min(255,Math.max(0,(int)Math.round(120+125*v)));
+            return Color.rgb(Math.min(255,(int)(g*1.10)),Math.min(255,(int)(g*.88)),(int)(g*.63));
+        }
+        if(v>0){double q=Math.pow(v,.83);return Color.rgb((int)(30+225*q),(int)(20+100*(1-q)),(int)(60*(1-q)));}
+        double q=Math.pow(-v,.83);return Color.rgb((int)(30*(1-q)),(int)(45+180*q),(int)(65+190*q));
     }
     private float[][] processed(List<GprProtocol.Trace> items,int rowCount,int visibleSamples){
         int n=items.size();float[][] result=new float[n][rowCount];
@@ -147,13 +120,10 @@ public final class GprRadargramView extends View {
         float dp=getResources().getDisplayMetrics().density;
         int left=(int)(52*dp),right=(int)(68*dp),top=(int)(28*dp),bottom=(int)(8*dp);
         int ww=Math.max(1,w-left-right),hh=Math.max(1,h-top-bottom);
-        graphLeft=left;graphTop=top;graphWidth=ww;graphHeight=hh;
-        currentWindow=fastLive?90:VISIBLE_TRACES;
         p.setStyle(Paint.Style.FILL);p.setColor(Color.BLACK);canvas.drawRect(left,top,left+ww,top+hh,p);
         List<GprProtocol.Trace> items=snapshot();
-        if(items.size()>currentWindow)items=items.subList(items.size()-currentWindow,items.size());
+        if(items.size()>VISIBLE_TRACES)items=items.subList(items.size()-VISIBLE_TRACES,items.size());
         int visibleN=items.size();
-        firstVisibleTrace=(int)Math.max(0,totalDisplayedTraces-visibleN);
         int visibleSamples=nSamples;
         if(hasTimeAxis()&&Double.isFinite(timeWindowNs))
             visibleSamples=Math.max(2,Math.min(nSamples,1+(int)Math.floor(timeWindowNs/dtNs)));
@@ -176,7 +146,7 @@ public final class GprRadargramView extends View {
                     double a0=sampled[Math.max(0,x-1)][y],a1=sampled[Math.min(visibleN-1,x+1)][y];
                     a+=(a-(a0+a1)*.5)*.48;
                 }
-                int section=Math.min(4,(int)((long)y*5/rows));
+                int section=Math.min(3,(int)((long)y*4/rows));
                 float localGain=depthGains[section];
                 double response=a/scale*localGain;
                 pixels[y*visibleN+x]=(gain<=0.0001f || localGain<=0.0001f ? Color.rgb(128,128,128) : shade(response));
@@ -184,18 +154,10 @@ public final class GprRadargramView extends View {
             Bitmap bmp=Bitmap.createBitmap(pixels,visibleN,rows,Bitmap.Config.ARGB_8888);
             p.setFilterBitmap(true);p.setStyle(Paint.Style.FILL);
             // Preserve a fixed x-step; leave unfilled space black and scroll left after 180 traces.
-            int drawnW=Math.max(1,Math.round(ww*(visibleN/(float)currentWindow)));
+            int drawnW=Math.max(1,Math.round(ww*(visibleN/(float)VISIBLE_TRACES)));
             canvas.drawBitmap(bmp,new Rect(0,0,visibleN,rows),new Rect(left,top,left+drawnW,top+hh),p);
             bmp.recycle();
         }
-        label.setTextAlign(Paint.Align.LEFT);
-        label.setColor(Color.rgb(40,228,203));
-        label.setTextSize(11*getResources().getDisplayMetrics().scaledDensity);
-        double travelled=totalTravelMeters();
-        String progress=Double.isFinite(travelled)?
-            String.format(Locale.forLanguageTag("tr-TR"),"İLERLEME %.2f m",travelled):
-            "İLERLEME -- m (mesafe verisi yok)";
-        canvas.drawText(progress,left+5*dp,top-9*dp,label);
         p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(dp*.65f);p.setColor(Color.rgb(85,111,125));
         canvas.drawRect(left,top,left+ww,top+hh,p);
         // PC-style right-hand MT* scale. An unknown SGY sample interval is NOT
@@ -232,27 +194,6 @@ public final class GprRadargramView extends View {
             p.setColor(Color.argb(65,145,168,183));
             canvas.drawLine(cx,top,cx,top+hh,p);
         }
-        if(cursorActive && visibleN>0 && cursorX>=left && cursorX<=left+ww
-                && cursorY>=top && cursorY<=top+hh){
-            int selected=Math.min(visibleN-1,Math.max(0,
-                (int)(((cursorX-left)/(float)Math.max(1,ww))*currentWindow)));
-            // Tek bir metre etiketi: dokunulan satirin tahmini derinligi.
-            // Gecerli zaman bilgisi yoksa gorunuse bakarak sayi uydurma.
-            double yFraction=(cursorY-top)/(double)Math.max(1,hh);
-            String metre=measuredNs?
-                String.format(Locale.forLanguageTag("tr-TR"),"%.2f m",yFraction*maxDepth):
-                "Metre kalibrasyonu yok";
-            p.setStyle(Paint.Style.STROKE);
-            p.setStrokeWidth(Math.max(1f,dp));p.setColor(Color.rgb(255,240,105));
-            canvas.drawLine(cursorX,top,cursorX,top+hh,p);
-            canvas.drawLine(left,cursorY,left+ww,cursorY,p);
-            p.setStyle(Paint.Style.FILL);p.setColor(Color.argb(218,4,18,29));
-            float labelW=Math.min(ww-4*dp,240*dp);
-            canvas.drawRect(left+3*dp,top+3*dp,left+3*dp+labelW,top+28*dp,p);
-            label.setTextAlign(Paint.Align.LEFT);
-            label.setTextSize(12*getResources().getDisplayMetrics().scaledDensity);
-            label.setColor(Color.WHITE);
-            canvas.drawText(metre,left+9*dp,top+21*dp,label);
-        }
+
     }
 }

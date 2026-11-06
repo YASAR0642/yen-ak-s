@@ -12,19 +12,12 @@ public final class CustomPaletteEditor {
     private CustomPaletteEditor(){}
     public static void show(Activity ctx){show(ctx,null);}
     public static void show(Activity ctx,Runnable onSaved){
-        showEditor(ctx,onSaved,-1);
-    }
-    private static void showEditor(Activity ctx,Runnable onSaved,int editIndex){
         final int[] stops={
             Color.rgb(0,28,125), Color.rgb(0,60,220), Color.rgb(0,135,255),
             Color.rgb(0,210,240), Color.rgb(48,171,145), Color.rgb(80,150,85),
             Color.rgb(210,196,45), Color.rgb(255,215,0), Color.rgb(255,119,5),
             Color.rgb(245,24,28)
         };
-        final ArrayList<CustomPaletteStore.Item> initialEntries=CustomPaletteStore.load(ctx);
-        if(editIndex>=0 && editIndex<initialEntries.size()){
-            System.arraycopy(initialEntries.get(editIndex).colors,0,stops,0,10);
-        }
         LinearLayout body=new LinearLayout(ctx);body.setOrientation(LinearLayout.VERTICAL);body.setPadding(22,12,22,12);
         TextView nameTitle=new TextView(ctx);nameTitle.setText("PALET ADI");nameTitle.setTextColor(Color.WHITE);nameTitle.setTextSize(16);body.addView(nameTitle);
         EditText name=new EditText(ctx);name.setSingleLine(true);name.setHint("Palet ismi (örn. KTD Özel 1)");name.setTextColor(Color.WHITE);name.setHintTextColor(Color.LTGRAY);body.addView(name);
@@ -49,21 +42,20 @@ public final class CustomPaletteEditor {
         body.addView(existing);
         Runnable refresh=()->{ArrayList<CustomPaletteStore.Item> entries=CustomPaletteStore.load(ctx);StringBuilder sb=new StringBuilder("Kayıtlı paletler ("+entries.size()+"/"+CustomPaletteStore.MAX+"):");for(CustomPaletteStore.Item item:entries)sb.append("\n• ").append(item.name);existing.setText(sb.toString());};refresh.run();
         ScrollView scroll=new ScrollView(ctx);scroll.addView(body);
-        AlertDialog dlg=new AlertDialog.Builder(ctx).setTitle(editIndex>=0?"PALET DÜZENLE":"RENK OLUŞTUR").setView(scroll)
+        AlertDialog dlg=new AlertDialog.Builder(ctx).setTitle("RENK OLUŞTUR").setView(scroll)
             .setPositiveButton("KAYDET",null).setNeutralButton("Kayıtlıları Yönet",null).setNegativeButton("İPTAL",null).create();
         dlg.setOnShowListener(d->{
             dlg.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
                 String n=name.getText().toString().trim();
                 if(n.isEmpty()){name.setError("Renk paletine isim verin");return;}
-                boolean ok=editIndex>=0?CustomPaletteStore.update(ctx,CustomPaletteStore.BASE+editIndex,n,stops):CustomPaletteStore.save(ctx,n,stops);
-                if(!ok){Toast.makeText(ctx,"Palet adı çakışıyor ya da palet sınırı dolu",Toast.LENGTH_LONG).show();return;}
+                if(!CustomPaletteStore.save(ctx,n,stops)){Toast.makeText(ctx,"Aynı isim zaten var veya 12 palet sınırına ulaşıldı",Toast.LENGTH_LONG).show();return;}
                 com.ktd.analyzer.view.ColorMaps.configure(ctx);
-                int selected=editIndex>=0?CustomPaletteStore.BASE+editIndex:CustomPaletteStore.BASE+CustomPaletteStore.load(ctx).size()-1;
+                int selected=CustomPaletteStore.BASE+CustomPaletteStore.load(ctx).size()-1;
                 Prefs.setPalette(ctx,selected);
                 if(onSaved!=null)onSaved.run();
                 Toast.makeText(ctx,"'"+n+"' kaydedildi. 2D / 3D / 4D / GMR paletlerinde seçilebilir.",Toast.LENGTH_LONG).show();dlg.dismiss();
             });
-            dlg.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(v->manage(ctx,onSaved,dlg));
+            dlg.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(v->manage(ctx,refresh));
         });dlg.show();
     }
     private interface ColorCallback{void onColor(int color);}
@@ -80,29 +72,20 @@ public final class CustomPaletteEditor {
         }update.run();
         new AlertDialog.Builder(ctx).setTitle(title).setView(root).setPositiveButton("BU RENGİ SEÇ",(d,w)->cb.onColor(Color.rgb(vals[0],vals[1],vals[2]))).setNegativeButton("İPTAL",null).show();
     }
-    private static void manage(Activity ctx,Runnable onSaved,AlertDialog parent){
+    private static void manage(Activity ctx,Runnable refresh){
         ArrayList<CustomPaletteStore.Item> items=CustomPaletteStore.load(ctx);
         if(items.isEmpty()){Toast.makeText(ctx,"Henüz kayıtlı palet yok",Toast.LENGTH_SHORT).show();return;}
         String[] names=new String[items.size()];for(int i=0;i<items.size();i++)names[i]=items.get(i).name;
-        new AlertDialog.Builder(ctx).setTitle("KAYITLI PALETLER · DÜZENLE / SİL")
-            .setItems(names,(d,idx)->new AlertDialog.Builder(ctx).setTitle(names[idx])
-                .setItems(new String[]{"DÜZENLE","SİL"},(dd,choice)->{
-                    if(choice==0){parent.dismiss();showEditor(ctx,onSaved,idx);return;}
-                    new AlertDialog.Builder(ctx).setMessage("'"+names[idx]+"' silinsin mi?")
-                        .setPositiveButton("SİL",(confirm,w)->{
-                            int selected=Prefs.palette(ctx),deleted=CustomPaletteStore.BASE+idx;
-                            if(CustomPaletteStore.delete(ctx,deleted)){
-                                if(selected==deleted)Prefs.setPalette(ctx,0);
-                                else if(selected>deleted)Prefs.setPalette(ctx,selected-1);
-                                com.ktd.analyzer.view.ColorMaps.configure(ctx);
-                                if(onSaved!=null)onSaved.run();
-                                Toast.makeText(ctx,"Palet silindi",Toast.LENGTH_SHORT).show();
-                                parent.dismiss();
-                                showEditor(ctx,onSaved,-1);
-                            }
-                        }).setNegativeButton("VAZGEÇ",null).show();
-                }).show())
-            .setNegativeButton("KAPAT",null).show();
+        new AlertDialog.Builder(ctx).setTitle("Silinecek paleti seç").setItems(names,(d,idx)->new AlertDialog.Builder(ctx).setMessage("'"+names[idx]+"' silinsin mi?")
+            .setPositiveButton("SİL",(dd,w)->{
+                int selected=Prefs.palette(ctx),deleted=CustomPaletteStore.BASE+idx;
+                if(CustomPaletteStore.delete(ctx,deleted)){
+                    if(selected==deleted)Prefs.setPalette(ctx,0);
+                    else if(selected>deleted)Prefs.setPalette(ctx,selected-1);
+                    com.ktd.analyzer.view.ColorMaps.configure(ctx);refresh.run();
+                    Toast.makeText(ctx,"Palet silindi",Toast.LENGTH_SHORT).show();
+                }
+            }).setNegativeButton("VAZGEÇ",null).show()).setNegativeButton("KAPAT",null).show();
     }
     private static int dp(Activity a,int n){return Math.round(n*a.getResources().getDisplayMetrics().density);}
 }

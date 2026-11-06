@@ -51,12 +51,12 @@ public final class ActivationActivity extends Activity {
         logo.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         form.addView(logo, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, Ui.dp(this, 150)));
 
-        TextView title = Ui.text(this, "KTD GPR SYSTEM", 24, Color.WHITE);
+        TextView title = Ui.text(this, "KTD 3D ANALYZER", 24, Color.WHITE);
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         title.setGravity(Gravity.CENTER);
         form.addView(title, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, Ui.dp(this, 48)));
 
-        TextView sub = Ui.text(this, "UYGULAMA AKTİVASYONU • v1.0.13", 15, Color.rgb(72, 214, 235));
+        TextView sub = Ui.text(this, "UYGULAMA AKTİVASYONU", 15, Color.rgb(72, 214, 235));
         sub.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         sub.setGravity(Gravity.CENTER);
         form.addView(sub, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, Ui.dp(this, 38)));
@@ -91,30 +91,7 @@ public final class ActivationActivity extends Activity {
         });
         form.addView(copy, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, Ui.dp(this, 48)));
 
-        TextView paste = Ui.text(this, "AKTİVASYON KODUNU PANODAN YAPIŞTIR", 13, Color.rgb(3, 20, 18));
-        paste.setGravity(Gravity.CENTER);
-        paste.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        paste.setBackground(Ui.bg(Color.rgb(245, 193, 74), 13, this));
-        LinearLayout.LayoutParams pasteLp = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, Ui.dp(this, 46));
-        pasteLp.setMargins(0, Ui.dp(this, 10), 0, 0);
-        form.addView(paste, pasteLp);
-        paste.setOnClickListener(v -> {
-            ClipboardManager cm = (ClipboardManager)getSystemService(Context.CLIPBOARD_SERVICE);
-            if (cm != null && cm.hasPrimaryClip() && cm.getPrimaryClip() != null
-                    && cm.getPrimaryClip().getItemCount() > 0) {
-                CharSequence content = cm.getPrimaryClip().getItemAt(0).coerceToText(this);
-                if (content != null) {
-                    codeInput.setText(content.toString());
-                    codeInput.setSelection(codeInput.length());
-                    Toast.makeText(this, "Kod panodan alındı", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-            }
-            Toast.makeText(this, "Panoda kod bulunamadı", Toast.LENGTH_SHORT).show();
-        });
-
-        TextView actLabel = Ui.text(this, "AKTİVASYON KODU (16 HANELİ)", 12, Color.rgb(150, 180, 198));
+        TextView actLabel = Ui.text(this, "16 HANELİ AKTİVASYON KODU", 12, Color.rgb(150, 180, 198));
         actLabel.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         LinearLayout.LayoutParams alp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, Ui.dp(this, 34));
         alp.setMargins(0, Ui.dp(this, 16), 0, 0);
@@ -123,7 +100,7 @@ public final class ActivationActivity extends Activity {
         codeInput = new EditText(this);
         codeInput.setTextColor(Color.WHITE);
         codeInput.setHintTextColor(Color.rgb(100, 128, 145));
-        codeInput.setHint("Örn: 4522-5677-1851-2439");
+        codeInput.setHint("16 rakamlı kod (1234-5678-9012-3456)");
         codeInput.setTextSize(13);
         codeInput.setSingleLine(false);
         codeInput.setMinLines(3);
@@ -154,25 +131,14 @@ public final class ActivationActivity extends Activity {
 
     private void doActivate() {
         String token = codeInput.getText().toString().replace("\n", "").replace("\r", "").trim();
-        // Önce cihaz-bagli 16 haneli aktivasyon, sonra eski imzali lisans destegi.
         if (LicenseManager.activate(this, token)) {
             status.setTextColor(Color.rgb(44, 220, 117));
             status.setText("AKTİVASYON BAŞARILI");
-            Intent next = new Intent(this, LiveGprActivity.class);
-            if (getIntent() != null && getIntent().getData() != null) {
-                next.setData(getIntent().getData());
-                next.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            }
-            startActivity(next);
+            startActivity(new Intent(this, MainActivity.class));
             finish();
         } else {
             status.setTextColor(Color.rgb(255, 90, 90));
-            String error = LicenseManager.validationError(this, token);
-            status.setText(error == null ? "Aktivasyon kaydedilemedi" : error);
-            new android.app.AlertDialog.Builder(this)
-                    .setTitle("Aktivasyon neden kabul edilmedi?")
-                    .setMessage(error == null ? "Kod doğrulandı, ancak aktivasyon kaydedilemedi." : error)
-                    .setPositiveButton("TAMAM", null).show();
+            status.setText("AKTİVASYON KODU GEÇERSİZ VEYA BU CİHAZA AİT DEĞİL");
         }
     }
 }

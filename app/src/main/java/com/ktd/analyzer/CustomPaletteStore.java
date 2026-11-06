@@ -49,16 +49,6 @@ public final class CustomPaletteStore {
         items.add(new Item(clean.length()>32?clean.substring(0,32):clean,colors.clone()));
         return persist(ctx,items);
     }
-    /** Preserve the same palette index when editing an existing entry. */
-    public static boolean update(Context ctx,int palette,String name,int[] colors){
-        int idx=palette-BASE;
-        String clean=name==null?"":name.trim();
-        ArrayList<Item> items=load(ctx);
-        if(idx<0||idx>=items.size()||clean.isEmpty()||colors==null||colors.length!=10)return false;
-        for(int i=0;i<items.size();i++)if(i!=idx&&items.get(i).name.equalsIgnoreCase(clean))return false;
-        items.set(idx,new Item(clean.length()>32?clean.substring(0,32):clean,colors.clone()));
-        return persist(ctx,items);
-    }
     public static boolean delete(Context ctx,int palette){
         int idx=palette-BASE;ArrayList<Item> items=load(ctx);
         if(idx<0||idx>=items.size())return false;

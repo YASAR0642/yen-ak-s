@@ -1,25 +1,21 @@
 plugins { id 'com.android.application' }
 
 android {
-    namespace 'com.ktd.activationadmin'
+    namespace 'com.ktd.analyzer'
     compileSdk 35
 
     defaultConfig {
-        applicationId 'com.ktd.activationadmin'
+        applicationId 'com.ktd.analyzer'
         minSdk 23
         targetSdk 35
-        versionCode 104
-        versionName '1.0.4'
+        versionCode 39107
+        versionName '3.9.107-ozel-paleti-gorunur'
     }
 
     buildTypes {
         release {
-            minifyEnabled true
-            shrinkResources true
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-        }
-        debug {
             minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
 
@@ -30,19 +26,6 @@ android {
 }
 
 
-// Kotlin 1.8+ stdlib already contains the JDK7/JDK8 extension classes.
-// Some AndroidX transitive dependencies still request 1.6.21 JDK split artifacts,
-// which causes Duplicate class errors when mixed with kotlin-stdlib 1.8.22.
-// Force the full Kotlin stdlib family to one compatible version.
-configurations.configureEach {
-    resolutionStrategy {
-        force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
-        force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22'
-        force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22'
-    }
-}
-
 dependencies {
     implementation 'androidx.core:core:1.13.1'
-    implementation 'androidx.biometric:biometric:1.1.0'
 }
