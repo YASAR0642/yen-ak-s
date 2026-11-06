@@ -1,0 +1,15 @@
+KTD GPR SYSTEM v1.0.13 - 16 HANELI AKTIVASYON
+
+Bu paket GPR uygulamasinin kaynak kodudur, aktivasyon yoneticisi degildir.
+Mevcut yonetici uygulamasini degistirmeyin.
+
+1) GitHub deposundaki eski dosyalari tamamen bu paketin dosyalariyla degistirin.
+2) Actions -> Android APK Derle -> yeni Workflow run ile APK uretilmesini bekleyin.
+3) APK yi yukleyip aktivasyon ekraninda v1.0.13 yazdigini dogrulayin.
+4) 16 karakterli GPR cihaz kodunu mevcut ureticiye girin ve bu cihaza ait 4-4-4-4 kodunu olusturun.
+5) Kodu girip AKTIVE ET'e basin.
+6) Yanlis cihaz veya yanlis kod icin acik hata gosterilir.
+
+Dikkat: GPR ve 3D uygulamalarinin cihaz kodlari farklidir.
+KTD1- RSA lisanslari da geriye donuk desteklenir.
+Kullanici telefonu ve APK Android uzerinde test edilmemistir.

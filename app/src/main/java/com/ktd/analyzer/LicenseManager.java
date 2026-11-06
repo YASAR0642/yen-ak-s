@@ -48,8 +48,18 @@ public final class LicenseManager {
         if (rawToken == null || rawToken.trim().isEmpty())
             return "Aktivasyon kodunu girin veya panodan yapistirin.";
         String token = cleanToken(rawToken);
+        // Mevcut KTD 3D aktivasyon ureticisinin 4-4-4-4 bicimli
+        // cihaz-bagli lisans kodlari desteklenir. RSA destegi de korunur.
+        String compact = token.replace("-", "");
+        if (compact.matches("[0-9]{16}")) {
+            if (Activation16Code.verify(deviceCode(c), token)) return null;
+            return "16 haneli aktivasyon kodu bu GPR cihaz koduyla eslesmiyor. "
+                    + "GPR uygulamasinda gorunen cihaz koduyla yeni kod uretin. "
+                    + "Surum: v1.0.13";
+        }
         if (!token.startsWith(PREFIX + "-"))
-            return "Kod KTD1- ile baslamali. Mevcut KTD Aktivasyon Yoneticisi v1.0.4 ile yeni kod uretin.";
+            return "Kod bicimi gecersiz. 16 haneli (XXXX-XXXX-XXXX-XXXX) "
+                    + "veya KTD1- ile baslayan lisans kodu girin.";
         String[] parts = token.split("-", 3);
         if (parts.length != 3 || !parts[1].matches("[0-9A-F]{16}") || parts[2].isEmpty())
             return "Kod bicimi eksik veya bozulmus. Yoneticide KOPYALA secenegini kullanin.";

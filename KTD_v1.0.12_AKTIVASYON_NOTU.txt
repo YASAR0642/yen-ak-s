@@ -1,0 +1,7 @@
+KTD GPR SYSTEM v1.0.12
+- Mevcut KTD 3D aktivasyon ureticisinin 16 haneli XXXX-XXXX-XXXX-XXXX kodlari eklendi.
+- KTD1 RSA lisans destegi korunur.
+- GPR ayri uygulama kimligi (com.ktd.gprsystem) ve cihaz kodu kullanir.
+- Aktivasyon Yonetici uygulamasini degistirmek gerekmez; GPR cihaz koduyla kod uretilmelidir.
+- Canli GPR radargram, Bluetooth, SGY ve sesli algilama kodu degistirilmedi.
+- APK derlemesi ve fiziksel telefon aktivasyonu bu ortamda test edilmedi.

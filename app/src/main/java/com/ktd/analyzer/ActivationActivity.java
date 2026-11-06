@@ -56,7 +56,7 @@ public final class ActivationActivity extends Activity {
         title.setGravity(Gravity.CENTER);
         form.addView(title, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, Ui.dp(this, 48)));
 
-        TextView sub = Ui.text(this, "UYGULAMA AKTİVASYONU", 15, Color.rgb(72, 214, 235));
+        TextView sub = Ui.text(this, "UYGULAMA AKTİVASYONU • v1.0.13", 15, Color.rgb(72, 214, 235));
         sub.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         sub.setGravity(Gravity.CENTER);
         form.addView(sub, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, Ui.dp(this, 38)));
@@ -114,7 +114,7 @@ public final class ActivationActivity extends Activity {
             Toast.makeText(this, "Panoda kod bulunamadı", Toast.LENGTH_SHORT).show();
         });
 
-        TextView actLabel = Ui.text(this, "AKTİVASYON KODU (KTD1)", 12, Color.rgb(150, 180, 198));
+        TextView actLabel = Ui.text(this, "AKTİVASYON KODU (16 HANELİ)", 12, Color.rgb(150, 180, 198));
         actLabel.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         LinearLayout.LayoutParams alp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, Ui.dp(this, 34));
         alp.setMargins(0, Ui.dp(this, 16), 0, 0);
@@ -123,7 +123,7 @@ public final class ActivationActivity extends Activity {
         codeInput = new EditText(this);
         codeInput.setTextColor(Color.WHITE);
         codeInput.setHintTextColor(Color.rgb(100, 128, 145));
-        codeInput.setHint("Mevcut KTD Aktivasyon Yöneticisinden üretilen KTD1 kodunu girin");
+        codeInput.setHint("Örn: 4522-5677-1851-2439");
         codeInput.setTextSize(13);
         codeInput.setSingleLine(false);
         codeInput.setMinLines(3);
@@ -154,6 +154,7 @@ public final class ActivationActivity extends Activity {
 
     private void doActivate() {
         String token = codeInput.getText().toString().replace("\n", "").replace("\r", "").trim();
+        // Önce cihaz-bagli 16 haneli aktivasyon, sonra eski imzali lisans destegi.
         if (LicenseManager.activate(this, token)) {
             status.setTextColor(Color.rgb(44, 220, 117));
             status.setText("AKTİVASYON BAŞARILI");
